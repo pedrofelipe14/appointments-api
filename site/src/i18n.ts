@@ -9,6 +9,7 @@ export const STRINGS = {
       title: 'Turnos que se agendan solos',
       subtitle: 'El cliente pide "esta semana, a la tarde". La API encuentra el primer horario libre y lo reserva, y el profesional lo confirma o lo rechaza. Nunca se dan dos turnos a la misma hora, aunque lleguen juntos.',
       tryIt: 'Probala en vivo',
+      app: 'Abrir la app',
       reference: 'Ver los endpoints',
       stats: [
         ['10 → 10', 'pedidos simultáneos, 10 horarios distintos'],
@@ -111,6 +112,7 @@ export const STRINGS = {
       title: 'Appointments that schedule themselves',
       subtitle: 'A client asks for "this week, in the afternoon". The API finds the first free time and holds it, and the provider confirms or rejects it. Two appointments never land on the same time, even when they arrive together.',
       tryIt: 'Try it live',
+      app: 'Open the app',
       reference: 'See the endpoints',
       stats: [
         ['10 → 10', 'simultaneous requests, 10 different times'],

@@ -101,6 +101,7 @@ export default function App() {
           <p className="lead">{t.hero.subtitle}</p>
           <div className="ctas">
             <a className="btn primary" href="#playground">{t.hero.tryIt}</a>
+            <a className="btn" href="./app/">{t.hero.app}</a>
             <a className="btn" href="#reference">{t.hero.reference}</a>
           </div>
           <div className="stats">

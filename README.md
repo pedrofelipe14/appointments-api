@@ -19,6 +19,13 @@
 
 **Portal para desarrolladores:** [pedrofelipe14.github.io/appointments-api](https://pedrofelipe14.github.io/appointments-api/) tiene una guía rápida con ejemplos en curl, JavaScript y Python, una guía de integración, la referencia generada automáticamente y un playground en vivo. La imagen de arriba sale de ese playground: 10 clientes piden turno a la vez en un día que tiene 10 horarios libres.
 
+**App web:** [pedrofelipe14.github.io/appointments-api/app](https://pedrofelipe14.github.io/appointments-api/app/) es la app en React que usa la API: el cliente pide turno (el primer horario libre o uno exacto) y el profesional carga sus horarios y servicios y confirma o rechaza los pedidos, con avisos en cada paso. Necesita la API corriendo (`docker compose up`).
+
+<p align="center">
+  <img src="docs/app-book.png" width="49%" alt="El cliente pide el primer horario libre de la tarde">
+  <img src="docs/app-requests.png" width="49%" alt="El profesional confirma o rechaza los pedidos">
+</p>
+
 Es el backend para cualquier negocio que trabaja con turnos: una profe de guitarra, una peluquería, un kinesiólogo, un profesor particular.
 
 1. El **profesional** publica sus servicios (duración y precio) y su horario semanal.
@@ -132,6 +139,12 @@ npm install
 npm run build && npm start         # aplica las migraciones y escucha en :3000
 ```
 
+**La app** (con la API corriendo en :3000):
+
+```sh
+cd app && npm install && npm run dev   # → http://localhost:5174
+```
+
 **Los tests** necesitan una base de PostgreSQL que puedan borrar:
 
 ```sh
@@ -156,4 +169,4 @@ TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appointments_test 
 
 ## Stack
 
-Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, SQL directo) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal) · Docker · GitHub Actions
+Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, SQL directo) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal y app) · Docker · GitHub Actions

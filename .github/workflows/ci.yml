@@ -59,6 +59,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             site/package-lock.json
+            app/package-lock.json
       - run: npm ci
       # The reference on the portal is regenerated from the API code on every build.
       - name: Export the OpenAPI spec from the code
@@ -70,6 +71,15 @@ jobs:
           npm run typecheck
           npm test
           npm run build
+      - name: App typecheck, tests and build
+        working-directory: app
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      # The app is served next to the portal, under /app/.
+      - run: cp -r app/dist site/dist/app
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:

@@ -19,6 +19,13 @@
 
 **Developer portal:** [pedrofelipe14.github.io/appointments-api](https://pedrofelipe14.github.io/appointments-api/) has a quickstart with curl, JavaScript and Python examples, an integration guide, an auto-generated reference and a live playground. The image above comes from that playground: 10 clients request a time on a day with 10 free times, all at once.
 
+**Web app:** [pedrofelipe14.github.io/appointments-api/app](https://pedrofelipe14.github.io/appointments-api/app/) is the React app on top of the API: clients book (the first free time or an exact one), and providers set their hours and services and confirm or reject requests, with notifications at every step. It needs the API running (`docker compose up`).
+
+<p align="center">
+  <img src="docs/app-book.png" width="49%" alt="A client asks for the first free afternoon time">
+  <img src="docs/app-requests.png" width="49%" alt="A provider confirms or rejects requests">
+</p>
+
 The API is a backend for any business that works by appointment: a guitar teacher, a hairdresser, a physio, a tutor.
 
 1. The **provider** publishes services (duration and price) and weekly working hours.
@@ -165,6 +172,12 @@ npm install
 npm run build && npm start         # applies migrations, then serves on :3000
 ```
 
+**The app** (with the API running on :3000):
+
+```sh
+cd app && npm install && npm run dev   # → http://localhost:5174
+```
+
 **Tests** need a PostgreSQL database they can wipe:
 
 ```sh
@@ -189,4 +202,4 @@ TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appointments_test 
 
 ## Stack
 
-Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, raw SQL) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal) · Docker · GitHub Actions
+Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, raw SQL) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal and app) · Docker · GitHub Actions
