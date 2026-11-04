@@ -1,0 +1,23 @@
+# `docker compose up` runs the API on http://localhost:3000 (docs at /docs) with its own PostgreSQL.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: courts
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      retries: 15
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/courts
+      JWT_SECRET: local-dev-secret-change-me-please
+      PORT: 3000
+    ports: ["3000:3000"]
+    depends_on:
+      db:
+        condition: service_healthy
