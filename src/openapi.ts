@@ -15,8 +15,8 @@ async function main(): Promise<void> {
   const spec = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('Court Booking API')
-      .setDescription('Book football courts: venues, courts, live availability and bookings that can never overlap.')
+      .setTitle('Appointments API')
+      .setDescription('Clients ask for "this week, in the afternoon"; the API picks the first free time and holds it until the provider confirms. Two requests never get the same time.')
       .setVersion('1.0')
       .addBearerAuth()
       .build(),

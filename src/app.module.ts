@@ -1,14 +1,13 @@
 import { Controller, Get, Module, type DynamicModule } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { AppointmentsController } from './appointments/appointments.controller'
+import { AppointmentsService } from './appointments/appointments.service'
 import { AuthModule } from './auth/auth.module'
-import { BookingsController } from './bookings/bookings.controller'
-import { BookingsService } from './bookings/bookings.service'
 import { APP_CONFIG, type AppConfig } from './config'
-import { CourtsController } from './courts/courts.controller'
-import { CourtsService } from './courts/courts.service'
 import { Database, DatabaseModule } from './db/database'
-import { VenuesController } from './venues/venues.controller'
-import { VenuesService } from './venues/venues.service'
+import { NotificationsController, NotificationsService } from './notifications/notifications'
+import { ProvidersController } from './providers/providers.controller'
+import { ProvidersService } from './providers/providers.service'
 
 @ApiTags('health')
 @Controller('health')
@@ -37,8 +36,8 @@ export class AppModule {
     return {
       module: AppModule,
       imports: [configModule, DatabaseModule, AuthModule],
-      controllers: [HealthController, VenuesController, CourtsController, BookingsController],
-      providers: [VenuesService, CourtsService, BookingsService],
+      controllers: [HealthController, ProvidersController, AppointmentsController, NotificationsController],
+      providers: [ProvidersService, AppointmentsService, NotificationsService],
     }
   }
 }

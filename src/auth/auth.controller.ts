@@ -11,7 +11,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('register')
-  @ApiOperation({ summary: 'Create an account', description: 'Players book courts; owners publish venues and courts.' })
+  @ApiOperation({ summary: 'Create an account', description: 'Clients request appointments; providers publish services and confirm requests.' })
   @ApiCreatedResponse({ type: UserResponse })
   @ApiConflictResponse({ description: 'Email already registered' })
   register(@Body() dto: RegisterDto): Promise<UserResponse> {

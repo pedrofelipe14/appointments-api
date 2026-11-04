@@ -11,7 +11,7 @@ describe('auth', () => {
 
   it('registers, logs in and returns the current user', async () => {
     const res = await ctx.http().post('/auth/register').send(user).expect(201)
-    expect(res.body).toMatchObject({ email: 'lio@example.com', name: 'Lio', role: 'player' })
+    expect(res.body).toMatchObject({ email: 'lio@example.com', name: 'Lio', role: 'client' })
     expect(res.body).not.toHaveProperty('passwordHash')
 
     const login = await ctx.http().post('/auth/login').send({ email: 'lio@example.com', password: user.password }).expect(200)
@@ -43,10 +43,10 @@ describe('auth', () => {
     await ctx.http().get('/auth/me').set('Authorization', 'Bearer garbage').expect(401)
   })
 
-  it('only lets owners create venues', async () => {
-    const player = await signUp(ctx, 'player')
-    await ctx.http().post('/venues').set('Authorization', player.token).send({ name: 'X', address: 'Y' }).expect(403)
-    const owner = await signUp(ctx, 'owner')
-    await ctx.http().post('/venues').set('Authorization', owner.token).send({ name: 'X', address: 'Y' }).expect(201)
+  it('only lets providers create a provider profile', async () => {
+    const client = await signUp(ctx, 'client')
+    await ctx.http().post('/providers').set('Authorization', client.token).send({ name: 'X' }).expect(403)
+    const provider = await signUp(ctx, 'provider')
+    await ctx.http().post('/providers').set('Authorization', provider.token).send({ name: 'X' }).expect(201)
   })
 })

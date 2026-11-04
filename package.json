@@ -1,8 +1,8 @@
 {
-  "name": "court-booking-api",
+  "name": "appointments-api",
   "version": "0.1.0",
   "private": true,
-  "description": "REST API for booking football courts: no double bookings, roles, payments, OpenAPI docs.",
+  "description": "Appointments API: clients ask for \"this week, afternoon\", the API picks a free time and the provider confirms. No double bookings, even under concurrency.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",

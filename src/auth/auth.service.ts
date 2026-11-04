@@ -11,7 +11,7 @@ interface UserRow {
   id: string
   email: string
   name: string
-  role: 'player' | 'owner' | 'admin'
+  role: 'client' | 'provider' | 'admin'
   password_hash: string
 }
 
@@ -26,7 +26,7 @@ export class AuthService {
       const row = await this.db.one<UserRow>(
         `insert into users (email, name, password_hash, role) values ($1, $2, $3, $4)
          returning id, email, name, role, password_hash`,
-        [dto.email.toLowerCase(), dto.name, await hashPassword(dto.password), dto.role ?? 'player'],
+        [dto.email.toLowerCase(), dto.name, await hashPassword(dto.password), dto.role ?? 'client'],
       )
       return toUser(row!)
     } catch (error) {

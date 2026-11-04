@@ -4,7 +4,7 @@ services:
     image: postgres:18
     environment:
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: courts
+      POSTGRES_DB: appointments
     ports: ["5432:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -14,7 +14,7 @@ services:
   api:
     build: .
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/courts
+      DATABASE_URL: postgres://postgres:postgres@db:5432/appointments
       JWT_SECRET: local-dev-secret-change-me-please
       PORT: 3000
     ports: ["3000:3000"]

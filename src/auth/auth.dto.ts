@@ -18,13 +18,13 @@ export class RegisterDto {
   password: string
 
   @ApiPropertyOptional({
-    enum: ['player', 'owner'],
-    default: 'player',
-    description: 'Owners can list venues and courts. Admins are never self-registered.',
+    enum: ['client', 'provider'],
+    default: 'client',
+    description: 'Providers publish services and confirm requests. Admins are never self-registered.',
   })
   @IsOptional()
-  @IsIn(['player', 'owner'])
-  role?: 'player' | 'owner'
+  @IsIn(['client', 'provider'])
+  role?: 'client' | 'provider'
 }
 
 export class LoginDto {
@@ -46,5 +46,5 @@ export class UserResponse {
   @ApiProperty() id: string
   @ApiProperty() email: string
   @ApiProperty() name: string
-  @ApiProperty({ enum: ['player', 'owner', 'admin'] }) role: string
+  @ApiProperty({ enum: ['client', 'provider', 'admin'] }) role: string
 }
