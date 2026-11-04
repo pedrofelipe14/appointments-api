@@ -16,17 +16,17 @@
         ]
       }
     },
-    "/venues": {
+    "/providers": {
       "post": {
-        "description": "Its time zone defines what \"09:00\" means for its courts.",
-        "operationId": "VenuesController_create",
+        "description": "One per provider account. Its time zone defines what \"10:00\" means.",
+        "operationId": "ProvidersController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateVenueDto"
+                "$ref": "#/components/schemas/CreateProviderDto"
               }
             }
           }
@@ -37,7 +37,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VenueResponse"
+                  "$ref": "#/components/schemas/ProviderResponse"
                 }
               }
             }
@@ -46,120 +46,10 @@
             "description": "Missing or invalid token"
           },
           "403": {
-            "description": "Requires role: owner or admin"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a venue",
-        "tags": [
-          "venues"
-        ]
-      },
-      "get": {
-        "operationId": "VenuesController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/VenueResponse"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "List venues",
-        "tags": [
-          "venues"
-        ]
-      }
-    },
-    "/venues/{id}": {
-      "get": {
-        "operationId": "VenuesController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VenueResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Venue not found"
-          }
-        },
-        "summary": "Get a venue",
-        "tags": [
-          "venues"
-        ]
-      }
-    },
-    "/venues/{venueId}/courts": {
-      "post": {
-        "description": "Sport, price per hour, opening hours and slot length.",
-        "operationId": "CourtsController_create",
-        "parameters": [
-          {
-            "name": "venueId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCourtDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CourtResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Requires role: owner or admin"
+            "description": "Requires role: provider or admin"
           },
           "409": {
-            "description": "Court name already used in this venue"
+            "description": "You already have a provider profile"
           }
         },
         "security": [
@@ -167,23 +57,15 @@
             "bearer": []
           }
         ],
-        "summary": "Add a court to your venue",
+        "summary": "Create your provider profile",
         "tags": [
-          "courts"
+          "providers"
         ]
       },
       "get": {
-        "operationId": "CourtsController_list",
-        "parameters": [
-          {
-            "name": "venueId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "description": "With their services and weekly working hours.",
+        "operationId": "ProvidersController_list",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "",
@@ -192,25 +74,22 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/CourtResponse"
+                    "$ref": "#/components/schemas/ProviderResponse"
                   }
                 }
               }
             }
-          },
-          "404": {
-            "description": "Venue not found"
           }
         },
-        "summary": "List the courts of a venue",
+        "summary": "List providers",
         "tags": [
-          "courts"
+          "providers"
         ]
       }
     },
-    "/courts/{id}": {
+    "/providers/{id}": {
       "get": {
-        "operationId": "CourtsController_get",
+        "operationId": "ProvidersController_get",
         "parameters": [
           {
             "name": "id",
@@ -227,30 +106,147 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CourtResponse"
+                  "$ref": "#/components/schemas/ProviderResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Court not found"
+            "description": "Provider not found"
           }
         },
-        "summary": "Get a court",
+        "summary": "Get a provider",
         "tags": [
-          "courts"
+          "providers"
         ]
       }
     },
-    "/courts/{id}/availability": {
-      "get": {
-        "description": "Every slot of the local date, with whether it can still be booked.",
-        "operationId": "CourtsController_availability",
+    "/providers/{id}/working-hours": {
+      "put": {
+        "description": "Replaces the whole schedule. Several ranges per day are allowed.",
+        "operationId": "ProvidersController_setHours",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkingHoursDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: provider or admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set your weekly working hours",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/providers/{id}/services": {
+      "post": {
+        "description": "Name, duration (multiple of 15 minutes) and price.",
+        "operationId": "ProvidersController_addService",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: provider or admin"
+          },
+          "409": {
+            "description": "Service name already used"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Offer a service",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/providers/{id}/availability": {
+      "get": {
+        "description": "Every start time a client could request, on a 15-minute grid.",
+        "operationId": "ProvidersController_availability",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serviceId",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -259,7 +255,7 @@
             "name": "date",
             "required": true,
             "in": "query",
-            "description": "Local date at the venue (YYYY-MM-DD)",
+            "description": "Local date at the provider's time zone (YYYY-MM-DD)",
             "schema": {
               "example": "2026-11-20",
               "type": "string"
@@ -268,7 +264,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Every slot of the day and whether it can still be booked",
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -281,46 +277,46 @@
             }
           }
         },
-        "summary": "Availability for a day",
+        "summary": "Free times for a service on a day",
         "tags": [
-          "courts"
+          "providers"
         ]
       }
     },
-    "/bookings": {
+    "/appointments": {
       "post": {
-        "description": "Held for 15 minutes until paid. Overlapping requests get 409, even when they arrive at the same instant.",
-        "operationId": "BookingsController_create",
+        "description": "Give a startsAt, or a window and time of day and let the API pick the first free time. The request stays pending until the provider confirms it. Concurrent requests never get the same time.",
+        "operationId": "AppointmentsController_request",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBookingDto"
+                "$ref": "#/components/schemas/RequestAppointmentDto"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Booked; holds the slot until paid",
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BookingResponse"
+                  "$ref": "#/components/schemas/AppointmentResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Outside opening hours, off the slot grid, or in the past"
+            "description": "Outside working hours, off the 15-minute grid, too soon, or a bad window"
           },
           "401": {
             "description": "Missing or invalid token"
           },
           "409": {
-            "description": "That time is already booked"
+            "description": "That time is taken, or no free time in the window"
           }
         },
         "security": [
@@ -328,15 +324,16 @@
             "bearer": []
           }
         ],
-        "summary": "Book a slot",
+        "summary": "Request an appointment",
         "tags": [
-          "bookings"
+          "appointments"
         ]
       }
     },
-    "/bookings/me": {
+    "/appointments/me": {
       "get": {
-        "operationId": "BookingsController_mine",
+        "description": "As a client, newest first.",
+        "operationId": "AppointmentsController_mine",
         "parameters": [],
         "responses": {
           "200": {
@@ -346,7 +343,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/BookingResponse"
+                    "$ref": "#/components/schemas/AppointmentResponse"
                   }
                 }
               }
@@ -361,16 +358,70 @@
             "bearer": []
           }
         ],
-        "summary": "My bookings",
+        "summary": "My appointments",
         "tags": [
-          "bookings"
+          "appointments"
         ]
       }
     },
-    "/bookings/{id}/cancel": {
+    "/appointments/inbox": {
+      "get": {
+        "description": "The provider's agenda. Filter with ?status=pending to see what needs an answer.",
+        "operationId": "AppointmentsController_inbox",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Only appointments in this status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "confirmed",
+                "rejected",
+                "cancelled",
+                "expired"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppointmentResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: provider or admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Requests and appointments to handle",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{id}/confirm": {
       "post": {
-        "description": "Players need 24 hours of notice; the venue owner can always cancel.",
-        "operationId": "BookingsController_cancel",
+        "description": "Only the provider. The client gets a notification.",
+        "operationId": "AppointmentsController_confirm",
         "parameters": [
           {
             "name": "id",
@@ -387,66 +438,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BookingResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Booking not found"
-          },
-          "409": {
-            "description": "Already cancelled/expired, or too close to start for a player to cancel"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cancel a booking",
-        "tags": [
-          "bookings"
-        ]
-      }
-    },
-    "/venues/{venueId}/bookings": {
-      "get": {
-        "description": "For the venue owner: the agenda of a local date.",
-        "operationId": "BookingsController_forVenue",
-        "parameters": [
-          {
-            "name": "venueId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": true,
-            "in": "query",
-            "description": "Local date at the venue (YYYY-MM-DD)",
-            "schema": {
-              "example": "2026-11-20",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "All bookings at the venue on that local date",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/BookingResponse"
-                  }
+                  "$ref": "#/components/schemas/AppointmentResponse"
                 }
               }
             }
@@ -455,7 +447,10 @@
             "description": "Missing or invalid token"
           },
           "403": {
-            "description": "Requires role: owner or admin"
+            "description": "Not this provider's request\n\nRequires role: provider or admin"
+          },
+          "409": {
+            "description": "Already answered, cancelled or expired"
           }
         },
         "security": [
@@ -463,15 +458,168 @@
             "bearer": []
           }
         ],
-        "summary": "A venue's bookings for a day",
+        "summary": "Confirm a request",
         "tags": [
-          "bookings"
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{id}/reject": {
+      "post": {
+        "description": "Only the provider, with a reason the client will see. The time frees up.",
+        "operationId": "AppointmentsController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: provider or admin"
+          },
+          "409": {
+            "description": "Already answered, cancelled or expired"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject a request",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{id}/cancel": {
+      "post": {
+        "description": "Client or provider. Clients need 12 hours of notice for confirmed appointments.",
+        "operationId": "AppointmentsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Appointment not found"
+          },
+          "409": {
+            "description": "Already over, or too late for the client to cancel"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel an appointment",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "description": "New requests for providers; confirmations, rejections, expirations and cancellations for clients.",
+        "operationId": "NotificationsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My notifications",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/read": {
+      "post": {
+        "operationId": "NotificationsController_readAll",
+        "parameters": [],
+        "responses": {
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark all as read",
+        "tags": [
+          "notifications"
         ]
       }
     },
     "/auth/register": {
       "post": {
-        "description": "Players book courts; owners publish venues and courts.",
+        "description": "Clients request appointments; providers publish services and confirm requests.",
         "operationId": "AuthController_register",
         "parameters": [],
         "requestBody": {
@@ -573,8 +721,8 @@
     }
   },
   "info": {
-    "title": "Court Booking API",
-    "description": "Book football courts: venues, courts, live availability and bookings that can never overlap.",
+    "title": "Appointments API",
+    "description": "Clients ask for \"this week, in the afternoon\"; the API picks the first free time and holds it until the provider confirms. Two requests never get the same time.",
     "version": "1.0",
     "contact": {}
   },
@@ -589,152 +737,194 @@
       }
     },
     "schemas": {
-      "CreateVenueDto": {
+      "CreateProviderDto": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "example": "Complejo La Bombonerita"
+            "example": "Clases de guitarra con Lucía"
           },
-          "address": {
+          "about": {
             "type": "string",
-            "example": "Av. Siempre Viva 742, Mar del Plata"
+            "example": "Guitarra eléctrica y acústica, todos los niveles."
           },
           "timezone": {
             "type": "string",
             "example": "America/Argentina/Buenos_Aires",
             "default": "America/Argentina/Buenos_Aires"
+          },
+          "confirmWithinHours": {
+            "type": "number",
+            "example": 24,
+            "default": 24,
+            "description": "Hours to confirm a request before it expires (1-168)"
           }
         },
         "required": [
-          "name",
-          "address"
+          "name"
         ]
       },
-      "VenueResponse": {
+      "ServiceResponse": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
+          "providerId": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
-          "address": {
+          "description": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "priceCents": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "providerId",
+          "name",
+          "description",
+          "durationMinutes",
+          "priceCents"
+        ]
+      },
+      "WorkingRangeResponse": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "number"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "10:00"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "13:00"
+          }
+        },
+        "required": [
+          "weekday",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "ProviderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "about": {
             "type": "string"
           },
           "timezone": {
             "type": "string"
           },
-          "ownerId": {
-            "type": "string"
+          "confirmWithinHours": {
+            "type": "number"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceResponse"
+            }
+          },
+          "workingHours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkingRangeResponse"
+            }
           }
         },
         "required": [
           "id",
+          "userId",
           "name",
-          "address",
+          "about",
           "timezone",
-          "ownerId"
+          "confirmWithinHours",
+          "services",
+          "workingHours"
         ]
       },
-      "CreateCourtDto": {
+      "WorkingRangeDto": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "number",
+            "example": 1,
+            "description": "ISO weekday: 1 = Monday ... 7 = Sunday"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "10:00"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "13:00"
+          }
+        },
+        "required": [
+          "weekday",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "WorkingHoursDto": {
+        "type": "object",
+        "properties": {
+          "hours": {
+            "description": "Replaces the whole weekly schedule",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkingRangeDto"
+            }
+          }
+        },
+        "required": [
+          "hours"
+        ]
+      },
+      "CreateServiceDto": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "example": "Cancha 1"
+            "example": "Clase individual"
           },
-          "sport": {
+          "description": {
             "type": "string",
-            "enum": [
-              "futbol5",
-              "futbol7",
-              "futbol11"
-            ]
+            "example": "Una hora, en el estudio o por videollamada."
           },
-          "pricePerHourCents": {
+          "durationMinutes": {
             "type": "number",
-            "example": 4500000,
-            "description": "Price per hour in cents (ARS 45,000.00)"
+            "example": 60,
+            "description": "Minutes, a multiple of 15 between 15 and 480"
           },
-          "opensAt": {
-            "type": "string",
-            "example": "09:00",
-            "description": "Local opening time (HH:MM)"
-          },
-          "closesAt": {
-            "type": "string",
-            "example": "23:00",
-            "description": "Local closing time (HH:MM), after opensAt"
-          },
-          "slotMinutes": {
+          "priceCents": {
             "type": "number",
-            "enum": [
-              30,
-              60,
-              90,
-              120
-            ],
-            "default": 60
+            "example": 1500000,
+            "description": "Price in cents (ARS 15,000.00)"
           }
         },
         "required": [
           "name",
-          "sport",
-          "pricePerHourCents",
-          "opensAt",
-          "closesAt"
-        ]
-      },
-      "CourtResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "venueId": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "sport": {
-            "type": "string",
-            "enum": [
-              "futbol5",
-              "futbol7",
-              "futbol11"
-            ]
-          },
-          "pricePerHourCents": {
-            "type": "number"
-          },
-          "opensAt": {
-            "type": "string",
-            "example": "09:00"
-          },
-          "closesAt": {
-            "type": "string",
-            "example": "23:00"
-          },
-          "slotMinutes": {
-            "type": "number"
-          },
-          "timezone": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "venueId",
-          "name",
-          "sport",
-          "pricePerHourCents",
-          "opensAt",
-          "closesAt",
-          "slotMinutes",
-          "timezone"
+          "durationMinutes",
+          "priceCents"
         ]
       },
       "SlotResponse": {
@@ -745,50 +935,76 @@
           },
           "endsAt": {
             "type": "string"
-          },
-          "available": {
-            "type": "boolean"
           }
         },
         "required": [
           "startsAt",
-          "endsAt",
-          "available"
+          "endsAt"
         ]
       },
-      "CreateBookingDto": {
+      "RequestAppointmentDto": {
         "type": "object",
         "properties": {
-          "courtId": {
+          "serviceId": {
             "type": "string"
           },
           "startsAt": {
             "type": "string",
-            "example": "2026-11-20T20:00:00-03:00",
-            "description": "ISO 8601 with offset; must fall on a slot boundary"
+            "example": "2026-11-20T16:00:00-03:00",
+            "description": "A specific start time. Leave it out to let the API pick the first free time."
           },
-          "durationMinutes": {
-            "type": "number",
-            "example": 60,
-            "description": "A multiple of the court slot length, up to 180"
+          "from": {
+            "type": "string",
+            "example": "2026-11-16",
+            "description": "Search from this local date (default: today)"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-11-22",
+            "description": "Search until this local date, inclusive (default: two weeks from \"from\")"
+          },
+          "timeOfDay": {
+            "type": "string",
+            "enum": [
+              "any",
+              "morning",
+              "afternoon",
+              "evening"
+            ],
+            "default": "any",
+            "description": "morning 6-12 · afternoon 12-19 · evening 19-24 (provider time)"
+          },
+          "note": {
+            "type": "string",
+            "example": "Primera clase, nivel principiante"
           }
         },
         "required": [
-          "courtId",
-          "startsAt",
-          "durationMinutes"
+          "serviceId"
         ]
       },
-      "BookingResponse": {
+      "AppointmentResponse": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "courtId": {
+          "providerId": {
             "type": "string"
           },
-          "userId": {
+          "providerName": {
+            "type": "string"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
             "type": "string"
           },
           "startsAt": {
@@ -800,20 +1016,26 @@
           "status": {
             "type": "string",
             "enum": [
-              "pending_payment",
+              "pending",
               "confirmed",
+              "rejected",
               "cancelled",
               "expired"
             ]
           },
           "priceCents": {
-            "type": "number",
-            "description": "Total price in cents"
+            "type": "number"
           },
-          "expiresAt": {
+          "note": {
+            "type": "string"
+          },
+          "rejectionReason": {
             "type": "object",
-            "nullable": true,
-            "description": "An unpaid booking stops holding the slot after this"
+            "nullable": true
+          },
+          "respondBy": {
+            "type": "string",
+            "description": "If the provider has not answered by then, the request expires"
           },
           "createdAt": {
             "type": "string"
@@ -821,14 +1043,92 @@
         },
         "required": [
           "id",
-          "courtId",
-          "userId",
+          "providerId",
+          "providerName",
+          "serviceId",
+          "serviceName",
+          "clientId",
+          "clientName",
           "startsAt",
           "endsAt",
           "status",
           "priceCents",
-          "expiresAt",
+          "note",
+          "rejectionReason",
+          "respondBy",
           "createdAt"
+        ]
+      },
+      "RejectDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "Ese día no estoy, ¿probás el jueves?"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "confirmed",
+              "rejected",
+              "expired",
+              "cancelled"
+            ]
+          },
+          "appointmentId": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "appointmentId",
+          "serviceName",
+          "startsAt",
+          "read",
+          "createdAt"
+        ]
+      },
+      "NotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            }
+          }
+        },
+        "required": [
+          "unread",
+          "items"
         ]
       },
       "RegisterDto": {
@@ -850,11 +1150,11 @@
           "role": {
             "type": "string",
             "enum": [
-              "player",
-              "owner"
+              "client",
+              "provider"
             ],
-            "default": "player",
-            "description": "Owners can list venues and courts. Admins are never self-registered."
+            "default": "client",
+            "description": "Providers publish services and confirm requests. Admins are never self-registered."
           }
         },
         "required": [
@@ -878,8 +1178,8 @@
           "role": {
             "type": "string",
             "enum": [
-              "player",
-              "owner",
+              "client",
+              "provider",
               "admin"
             ]
           }

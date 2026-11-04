@@ -10,41 +10,41 @@ describe('reading the generated OpenAPI spec', () => {
   const ops = operations(spec)
 
   it('finds every endpoint of the API', () => {
-    expect(ops).toHaveLength(15)
-    expect(ops.map((o) => `${o.method} ${o.path}`)).toContain('POST /bookings')
+    expect(ops).toHaveLength(18)
+    expect(ops.map((o) => `${o.method} ${o.path}`)).toContain('POST /appointments')
     expect(ops.every((o) => o.summary)).toBe(true) // every endpoint documents itself
   })
 
   it('knows which endpoints need a token', () => {
     const find = (m: string, p: string) => ops.find((o) => o.method === m && o.path === p)!
-    expect(find('POST', '/bookings').auth).toBe(true)
-    expect(find('GET', '/courts/{id}/availability').auth).toBe(false)
+    expect(find('POST', '/appointments').auth).toBe(true)
+    expect(find('GET', '/providers/{id}/availability').auth).toBe(false)
   })
 
   it('groups endpoints by area', () => {
-    expect(byTag(ops).map(([tag]) => tag)).toEqual(['health', 'venues', 'courts', 'bookings', 'auth'])
+    expect(byTag(ops).map(([tag]) => tag)).toEqual(['health', 'providers', 'appointments', 'notifications', 'auth'])
   })
 
   it('builds request examples from the examples written in the API code', () => {
-    const book = ops.find((o) => o.method === 'POST' && o.path === '/bookings')!
-    expect(schemaName(book.body)).toBe('CreateBookingDto')
-    expect(example(spec, book.body)).toMatchObject({ durationMinutes: 60, startsAt: '2026-11-20T20:00:00-03:00' })
-    expect(resolve(spec, book.body)?.required).toContain('courtId')
+    const book = ops.find((o) => o.method === 'POST' && o.path === '/appointments')!
+    expect(schemaName(book.body)).toBe('RequestAppointmentDto')
+    expect(example(spec, book.body)).toMatchObject({ from: '2026-11-16', timeOfDay: 'any', startsAt: '2026-11-20T16:00:00-03:00' })
+    expect(resolve(spec, book.body)?.required).toContain('serviceId')
   })
 })
 
 describe('code snippets', () => {
-  const call = { method: 'POST', path: '/bookings', auth: true, body: { courtId: 'abc', durationMinutes: 60, paid: false } }
+  const call = { method: 'POST', path: '/appointments', auth: true, body: { serviceId: 'abc', durationMinutes: 60, paid: false } }
 
   it('writes curl', () => {
     expect(curl(call, 'https://api.test')).toBe(
-      `curl -X POST "https://api.test/bookings" \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"courtId":"abc","durationMinutes":60,"paid":false}'`,
+      `curl -X POST "https://api.test/appointments" \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"serviceId":"abc","durationMinutes":60,"paid":false}'`,
     )
   })
 
   it('writes JavaScript with the token and JSON body', () => {
     const js = javascript(call, 'https://api.test')
-    expect(js).toContain("fetch('https://api.test/bookings'")
+    expect(js).toContain("fetch('https://api.test/appointments'")
     expect(js).toContain('Authorization: `Bearer ${token}`')
     expect(js).toContain('"durationMinutes": 60')
   })

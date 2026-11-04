@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Strings } from '../i18n'
-import { ApiClient, type LogEntry, runRace, runTour } from '../playground'
+import { ApiClient, type Cell, type LogEntry, runRace, runTour } from '../playground'
 
 interface Props {
   base: string
@@ -14,8 +14,8 @@ type Health = 'checking' | 'online' | 'offline'
 export function Playground({ base, onBaseChange, t }: Props) {
   const [health, setHealth] = useState<Health>('checking')
   const [log, setLog] = useState<LogEntry[]>([])
-  const [cells, setCells] = useState<(number | 'pending')[]>([])
-  const [result, setResult] = useState<{ won: number; lost: number } | null>(null)
+  const [cells, setCells] = useState<Cell[]>([])
+  const [result, setResult] = useState<{ distinct: number; late: number } | null>(null)
   const [running, setRunning] = useState(false)
   const logEnd = useRef<HTMLDivElement>(null)
 
@@ -87,13 +87,14 @@ export function Playground({ base, onBaseChange, t }: Props) {
       {cells.length > 0 && (
         <div className="race">
           <div className="race-grid">
-            {cells.map((c, i) => (
-              <span key={i} className={`cell ${c === 201 ? 'won' : c === 'pending' ? 'pending' : 'lost'}`} title={String(c)}>
-                {c === 'pending' ? '' : c}
+            {/* Sorted by the time each request got, so the day fills up like a calendar. */}
+            {[...cells].sort((a, b) => (a.time ?? '~').localeCompare(b.time ?? '~')).map((c, i) => (
+              <span key={i} className={`cell ${c.status === 201 ? 'won' : c.status === 'pending' ? 'pending' : 'lost'}`} title={String(c.status)}>
+                {c.status === 'pending' ? '' : c.time ?? c.status}
               </span>
             ))}
           </div>
-          {result && <p className="race-result">{t.raceResult(result.won, result.lost)}</p>}
+          {result && <p className="race-result">{t.raceResult(result.distinct, result.late)}</p>}
         </div>
       )}
 

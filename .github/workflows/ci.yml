@@ -45,7 +45,7 @@ jobs:
       - name: Build
         run: npm run build
       - name: Docker image builds
-        run: docker build -t court-booking-api .
+        run: docker build -t appointments-api .
 
   portal:
     needs: api

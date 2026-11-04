@@ -6,34 +6,38 @@ import { initialLang, type Lang, saveLang, STRINGS } from './i18n'
 import { byTag, type OpenApiSpec, operations } from './openapi'
 import type { Call } from './snippets'
 
-const REPO = 'https://github.com/pedrofelipe14/court-booking-api'
-const COURT = '3f8a2c1e-5b7d-4e9f-a1c2-7d6e5f4a3b2c'
+const REPO = 'https://github.com/pedrofelipe14/appointments-api'
+const SERVICE = '3f8a2c1e-5b7d-4e9f-a1c2-7d6e5f4a3b2c'
+const APPOINTMENT = '9b1d4e7a-2c3f-4a5b-8d6e-1f2a3b4c5d6e'
 
-// The four quickstart requests (texts come from i18n, in the same order).
+// The first three quickstart requests (texts come from i18n, in the same order).
 const QUICKSTART: Call[] = [
   { method: 'POST', path: '/auth/login', body: { email: 'lio@example.com', password: 'a-long-password' } },
-  { method: 'GET', path: `/courts/${COURT}/availability`, query: { date: '2026-11-20' } },
-  { method: 'POST', path: '/bookings', auth: true, body: { courtId: COURT, startsAt: '2026-11-20T20:00:00-03:00', durationMinutes: 60 } },
-  { method: 'POST', path: '/bookings', auth: true, body: { courtId: COURT, startsAt: '2026-11-20T20:00:00-03:00', durationMinutes: 60 } },
+  { method: 'POST', path: '/appointments', auth: true, body: { serviceId: SERVICE, from: '2026-11-16', to: '2026-11-22', timeOfDay: 'afternoon' } },
+  { method: 'POST', path: `/appointments/${APPOINTMENT}/confirm`, auth: true },
 ]
 
-const CONSTRAINT_SQL = `-- migrations/001_init.sql
-constraint bookings_no_overlap exclude using gist (
-  court_id with =,                                -- same court...
+const CONSTRAINT_SQL = `-- 1. Requests for one provider take turns (appointments.service.ts)
+select 1 from providers where id = $1 for no key update;
+-- ...then find the first free time and insert it.
+
+-- 2. And the database refuses overlaps anyway (migrations/001_init.sql)
+constraint appointments_no_overlap exclude using gist (
+  provider_id with =,                             -- same provider...
   tstzrange(starts_at, ends_at, '[)') with &&     -- ...and overlapping times
-) where (status in ('pending_payment', 'confirmed'))`
+) where (status in ('pending', 'confirmed'))`
 
-const TIMEZONE_JS = `// Availability comes back in UTC: label each slot in the venue's time zone.
+const TIMEZONE_JS = `// Times come back in UTC: show them in the provider's time zone.
 const label = new Intl.DateTimeFormat('es-AR', {
-  timeZone: venue.timezone,          // "America/Argentina/Buenos_Aires"
-  hour: '2-digit', minute: '2-digit',
+  timeZone: provider.timezone,       // "America/Argentina/Buenos_Aires"
+  weekday: 'long', hour: '2-digit', minute: '2-digit',
 })
-const grid = slots.map((s) => ({ ...s, label: label.format(new Date(s.startsAt)) }))`
+label.format(new Date(appointment.startsAt))   // "jueves, 16:00"`
 
-const CONFLICT_JS = `const res = await fetch(\`\${API}/bookings\`, { method: 'POST', headers, body })
+const CONFLICT_JS = `const res = await fetch(\`\${API}/appointments\`, { method: 'POST', headers, body })
 if (res.status === 409) {
-  showToast('Ese turno se acaba de ocupar')   // someone else won the slot
-  await reloadAvailability()
+  const { message } = await res.json()   // "No free time between 2026-11-16 and 2026-11-22"
+  showToast('No hay lugar esa semana. ¿Probamos la próxima?')
 }`
 
 const loadBase = () => {
@@ -74,7 +78,7 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <a href="#" className="brand"><span className="ball" aria-hidden="true" />Court Booking API</a>
+        <a href="#" className="brand"><span className="ball" aria-hidden="true" />Appointments API</a>
         <nav>
           {sections.map((s) => <a key={s} href={`#${s}`}>{t.nav[s]}</a>)}
         </nav>

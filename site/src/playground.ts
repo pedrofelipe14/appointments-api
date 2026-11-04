@@ -36,7 +36,7 @@ export class ApiClient {
     return { status: res.status, data }
   }
 
-  /** Quiet call: not logged (used for the 25 sign-ups before the race). */
+  /** Quiet call: not logged (used for the sign-ups before the race). */
   async silent<T = any>(method: string, path: string, body?: unknown, token?: string): Promise<Reply<T>> {
     const res = await fetch(this.base + path, {
       method,
@@ -49,19 +49,20 @@ export class ApiClient {
 
 const ZONE = 'America/Argentina/Buenos_Aires'
 
-/** A date some days ahead, as the venue's local YYYY-MM-DD. */
+/** A date some days ahead, as the provider's local YYYY-MM-DD. */
 export function localDate(daysAhead: number, now = new Date()): string {
   const d = new Date(now.getTime() + daysAhead * 86_400_000)
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
 }
 
-/** A local time at the venue (Argentina is UTC-3 all year). */
-export const atLocal = (date: string, hhmm: string) => `${date}T${hhmm}:00-03:00`
+/** "HH:MM" at the provider for an ISO timestamp. */
+export const localTime = (iso: string) =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 
 const uid = () => Math.random().toString(36).slice(2, 8)
 const PASSWORD = 'demo-password-123'
 
-async function account(api: ApiClient, role: 'owner' | 'player', name: string, logged: boolean): Promise<string> {
+async function account(api: ApiClient, role: 'provider' | 'client', name: string, logged: boolean): Promise<string> {
   const email = `${name.toLowerCase()}-${uid()}@demo.dev`
   const call = logged ? api.call.bind(api) : api.silent.bind(api)
   await call('POST', '/auth/register', { email, name, password: PASSWORD, role })
@@ -69,51 +70,60 @@ async function account(api: ApiClient, role: 'owner' | 'player', name: string, l
   return login.data.accessToken
 }
 
-/** An owner with a fresh venue and a 5-a-side court open 09:00-23:00. */
-async function setUpCourt(api: ApiClient, logged: boolean): Promise<{ owner: string; venueId: string; courtId: string }> {
-  const owner = await account(api, 'owner', 'Marta', logged)
+/** A guitar teacher working every day from `opens` to `closes`, offering a 60-minute class. */
+async function setUpProvider(api: ApiClient, logged: boolean, opens: string, closes: string) {
+  const token = await account(api, 'provider', 'Lucia', logged)
   const call = logged ? api.call.bind(api) : api.silent.bind(api)
-  const venue = await call<{ id: string }>('POST', '/venues', { name: `Complejo ${uid()}`, address: 'Calle Falsa 123' }, owner)
-  const court = await call<{ id: string }>('POST', `/venues/${venue.data.id}/courts`,
-    { name: 'Cancha 1', sport: 'futbol5', pricePerHourCents: 4_500_000, opensAt: '09:00', closesAt: '23:00' }, owner)
-  return { owner, venueId: venue.data.id, courtId: court.data.id }
+  const provider = await call<{ id: string }>('POST', '/providers', { name: `Lucía · guitarra ${uid()}`, confirmWithinHours: 24 }, token)
+  const hours = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, startsAt: opens, endsAt: closes }))
+  await call('PUT', `/providers/${provider.data.id}/working-hours`, { hours }, token)
+  const service = await call<{ id: string }>('POST', `/providers/${provider.data.id}/services`,
+    { name: 'Clase individual', durationMinutes: 60, priceCents: 2_000_000 }, token)
+  return { token, providerId: provider.data.id, serviceId: service.data.id }
 }
 
 export async function runTour(api: ApiClient): Promise<void> {
-  const { owner, venueId, courtId } = await setUpCourt(api, true)
-  const lio = await account(api, 'player', 'Lio', true)
-  const fede = await account(api, 'player', 'Fede', true)
-  const date = localDate(3)
+  const lucia = await setUpProvider(api, true, '10:00', '19:00')
+  const lio = await account(api, 'client', 'Lio', true)
+  const fede = await account(api, 'client', 'Fede', true)
+  const window = { from: localDate(1), to: localDate(7), timeOfDay: 'afternoon' }
 
-  await api.call('GET', `/courts/${courtId}/availability?date=${date}`)
-  const booking = await api.call<{ id: string }>('POST', '/bookings', { courtId, startsAt: atLocal(date, '20:00'), durationMinutes: 120 }, lio, 'Lio · 20:00–22:00')
-  await api.call('POST', '/bookings', { courtId, startsAt: atLocal(date, '21:00'), durationMinutes: 60 }, fede, 'Fede · 21:00–22:00')
-  await api.call('POST', '/bookings', { courtId, startsAt: atLocal(date, '22:00'), durationMinutes: 60 }, fede, 'Fede · 22:00–23:00')
-  await api.call('POST', '/bookings', { courtId, startsAt: atLocal(date, '08:00'), durationMinutes: 60 }, fede, 'Fede · 08:00')
-  await api.call('GET', `/venues/${venueId}/bookings?date=${date}`, undefined, owner, 'Marta · agenda')
-  await api.call('POST', `/bookings/${booking.data.id}/cancel`, undefined, lio, 'Lio · cancel')
+  const first = await api.call<{ id: string; startsAt: string }>('POST', '/appointments',
+    { serviceId: lucia.serviceId, ...window, note: 'Primera clase' }, lio, 'Lio · "this week, afternoon"')
+  await api.call('POST', '/appointments', { serviceId: lucia.serviceId, startsAt: first.data.startsAt }, fede,
+    `Fede · ${localTime(first.data.startsAt)}, taken`)
+  const second = await api.call<{ id: string }>('POST', '/appointments', { serviceId: lucia.serviceId, ...window }, fede, 'Fede · first free afternoon')
+  await api.call('GET', '/appointments/inbox?status=pending', undefined, lucia.token, 'Lucía · pending')
+  await api.call('POST', `/appointments/${first.data.id}/confirm`, undefined, lucia.token, 'Lucía confirms Lio')
+  await api.call('POST', `/appointments/${second.data.id}/reject`, { reason: 'Ese día no puedo, ¿probás el jueves?' }, lucia.token, 'Lucía rejects Fede')
+  await api.call('GET', '/notifications', undefined, fede, 'Fede · notifications')
 }
 
-/** 25 players fire a booking for the same slot at once. onCell reports each request's outcome. */
+export type Cell = { status: number | 'pending'; time?: string }
+
+/** 10 clients ask for "any time that day" at once; the day has exactly 10 one-hour slots.
+    onCell reports each request's outcome; an 11th, late request finds the day full. */
 export async function runRace(
   api: ApiClient,
-  onCell: (index: number, status: number | 'pending') => void,
-  players = 25,
-): Promise<{ won: number; lost: number }> {
-  const { courtId } = await setUpCourt(api, true)
+  onCell: (index: number, cell: Cell) => void,
+  clients = 10,
+): Promise<{ distinct: number; late: number }> {
+  const { serviceId } = await setUpProvider(api, true, '09:00', '19:00')
   const tokens: string[] = []
-  for (let i = 0; i < players; i++) {
-    tokens.push(await account(api, 'player', `Fan${i}`, false))
-    onCell(i, 'pending')
+  for (let i = 0; i < clients; i++) {
+    tokens.push(await account(api, 'client', `Client${i}`, false))
+    onCell(i, { status: 'pending' })
   }
-  const startsAt = atLocal(localDate(5), '21:00')
-  const results = await Promise.all(
+  const day = localDate(5)
+  const times = await Promise.all(
     tokens.map(async (token, i) => {
-      const res = await api.silent('POST', '/bookings', { courtId, startsAt, durationMinutes: 60 }, token)
-      onCell(i, res.status)
-      return res.status
+      const res = await api.silent<{ startsAt: string }>('POST', '/appointments', { serviceId, from: day, to: day }, token)
+      const time = res.status === 201 ? localTime(res.data.startsAt) : undefined
+      onCell(i, { status: res.status, time })
+      return time
     }),
   )
-  await api.call('GET', `/courts/${courtId}/availability?date=${localDate(5)}`, undefined, undefined, '21:00')
-  return { won: results.filter((s) => s === 201).length, lost: results.filter((s) => s === 409).length }
+  const late = await account(api, 'client', 'Late', false)
+  const full = await api.call('POST', '/appointments', { serviceId, from: day, to: day }, late, 'Client 11 · day is full')
+  return { distinct: new Set(times.filter(Boolean)).size, late: full.status }
 }

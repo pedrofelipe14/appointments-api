@@ -1,52 +1,67 @@
 <div align="center">
 
-# Court Booking API
+# Appointments API
 
-**A REST API for booking football courts, where a double booking is impossible, even under load.**
+**Clients ask for "this week, in the afternoon". The API picks a free time and the provider confirms it. Two appointments never land on the same time, even when the requests arrive in the same instant.**
 
 **English** · [Español](README.es.md)
 
-[![CI](https://github.com/pedrofelipe14/court-booking-api/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrofelipe14/court-booking-api/actions/workflows/ci.yml)
+[![CI](https://github.com/pedrofelipe14/appointments-api/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrofelipe14/appointments-api/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/Node-24-339933?logo=nodedotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-27_passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-28_passing-2ea44f)
+
+![Ten clients request at the same instant and get ten different times](docs/race.png)
 
 </div>
 
-**Developer portal:** [pedrofelipe14.github.io/court-booking-api](https://pedrofelipe14.github.io/court-booking-api/) has a quickstart with curl, JavaScript and Python examples, an integration guide, an auto-generated reference and a live playground.
+**Developer portal:** [pedrofelipe14.github.io/appointments-api](https://pedrofelipe14.github.io/appointments-api/) has a quickstart with curl, JavaScript and Python examples, an integration guide, an auto-generated reference and a live playground. The image above comes from that playground: 10 clients request a time on a day with 10 free times, all at once.
 
-Venue owners publish their courts and opening hours. Players see live availability, book a slot and cancel with enough notice. It's the backend that my app [CoordeFutbol](https://github.com/pedrofelipe14/coordenadas-futbol), which organizes matches among friends, needs in order to book the pitch.
+The API is a backend for any business that works by appointment: a guitar teacher, a hairdresser, a physio, a tutor.
+
+1. The **provider** publishes services (duration and price) and weekly working hours.
+2. The **client** doesn't hunt through a grid. They say which days and which part of the day suit them, and the API **assigns the first free time**. They can still ask for an exact time.
+3. The request stays **pending** and holds the time until the provider **confirms** it or **rejects** it with a reason.
+4. If nobody answers in time (24 h by default), the request **expires** and the time frees up.
+5. Both sides get **notifications** at every step.
 
 ## What this project shows
 
 | | |
 |---|---|
-| **Concurrency done right** | **25 simultaneous requests** for the same slot: exactly **one** gets the booking and the other 24 get `409 Conflict`. The guarantee comes from a PostgreSQL exclusion constraint, not from application code that can race. |
-| **SQL and data modelling** | Hand-written migrations, enums, check constraints, a GiST exclusion constraint over time ranges, and row locking (`FOR UPDATE`) where it matters. |
-| **Auth and security** | JWT with roles (player, owner, admin) and scrypt password hashing with constant-time comparison. Login returns the same error for a wrong password and an unknown email. Requests with unexpected fields are rejected. |
-| **Domain rules** | Time zones, a slot grid, opening hours, unpaid holds that expire, and a 24-hour notice before a player can cancel. |
-| **Testing** | **27 tests**, mostly end-to-end over HTTP against a **real PostgreSQL**: no mocked database. |
-| **Delivery** | OpenAPI/Swagger docs, a Dockerfile, `docker compose up`, and CI with a PostgreSQL service that also builds the Docker image. |
-| **Developer experience** | A bilingual developer portal: quickstart, integration guide, a reference generated from the OpenAPI spec on every build (so it never drifts from the code), and a playground that runs real scenarios against the API, including the 25-request race. |
+| **Concurrency done right** | **10 simultaneous "first free time" requests get 10 different times**, and an 11th gets `409`. With an exact time, **25 simultaneous requests produce exactly one appointment**. |
+| **Scheduling logic** | Weekly hours with several ranges per day, a 15-minute grid, time-of-day preferences, minimum notice, and time zones. It is all pure, unit-tested functions. |
+| **SQL and data modelling** | Hand-written migrations, enums, check constraints, a GiST exclusion constraint over time ranges, and row locks (`FOR UPDATE`, `FOR NO KEY UPDATE`). |
+| **A real workflow** | A state machine (pending → confirmed / rejected / expired / cancelled), deadlines, cancellation rules per role, and notifications written in the same transaction as the change they describe. |
+| **Auth and security** | JWT with roles (client, provider, admin), scrypt password hashing, the same error for a wrong password and an unknown email, and rejection of unexpected fields. |
+| **Testing** | **28 tests**, mostly end-to-end over HTTP against a **real PostgreSQL**. Nothing is mocked. |
+| **Delivery** | OpenAPI/Swagger docs, a Dockerfile, `docker compose up`, CI with a PostgreSQL service, and a bilingual developer portal deployed to GitHub Pages. |
 
-## The hard part: no double bookings
+## The hard part: ten clients, the same second
 
-Two players press "book" on the same slot in the same instant. Checking first ("is it free?") and then inserting doesn't work, because both checks pass before either insert lands.
+Ten clients ask for "the first free time on Friday" at the same moment. The naive implementation computes free times, then inserts. All ten see 09:00 as free and all ten try to take 09:00.
 
-The rule lives in the database instead (`migrations/001_init.sql`):
+Two layers solve it:
 
 ```sql
-constraint bookings_no_overlap exclude using gist (
-  court_id with =,
+-- 1. Requests for the same provider take turns (appointments.service.ts).
+--    Each one sees what the previous one took, so it gets the next free time.
+select 1 from providers where id = $1 for no key update;
+
+-- 2. The database refuses overlaps anyway (migrations/001_init.sql).
+constraint appointments_no_overlap exclude using gist (
+  provider_id with =,
   tstzrange(starts_at, ends_at, '[)') with &&
-) where (status in ('pending_payment', 'confirmed'))
+) where (status in ('pending', 'confirmed'))
 ```
 
-PostgreSQL refuses to keep two active bookings whose time ranges overlap on the same court, whatever order the transactions run in. The API turns that error (`23P01`) into a `409 Conflict`. Thanks to the half-open `[)` ranges, a booking that ends at 20:00 doesn't collide with one that starts at 20:00. Cancelled and expired bookings stop counting, so their slot frees up.
+The lock only queues requests **for the same provider**. Requests for different providers run in parallel. `FOR NO KEY UPDATE` doesn't block the foreign-key checks of other inserts.
 
-The test suite fires 25 concurrent requests at one slot and checks that exactly one row was written.
+The exclusion constraint is the final guarantee. If any code path ever tried to write two active appointments that overlap, PostgreSQL would reject it (`23P01` → `409`). Half-open `[)` ranges let an appointment that ends at 10:00 sit next to one that starts at 10:00.
+
+Why not rely on the constraint alone? I tried that first and the tests caught the problem. When concurrent inserts conflict on an exclusion constraint, each one waits for the other, and PostgreSQL resolves that by aborting one with a **deadlock** error (`40P01`), not a clean conflict. Queuing per provider removes the deadlock.
 
 ## API
 
@@ -54,19 +69,21 @@ Interactive docs at **`/docs`** (Swagger UI) once the server is running.
 
 | Method | Path | Who | What |
 |---|---|---|---|
-| `POST` | `/auth/register` | anyone | Create a player or owner account |
-| `POST` | `/auth/login` | anyone | Get a JWT (valid 1 h) |
+| `POST` | `/auth/register`, `/auth/login` | anyone | Create a client or provider account, get a JWT |
 | `GET` | `/auth/me` | logged in | The current user |
-| `POST` | `/venues` | owner, admin | Create a venue (with its time zone) |
-| `GET` | `/venues`, `/venues/:id` | anyone | Browse venues |
-| `POST` | `/venues/:id/courts` | venue owner | Add a court: sport, price per hour, opening hours, slot length |
-| `GET` | `/venues/:id/courts`, `/courts/:id` | anyone | Browse courts |
-| `GET` | `/courts/:id/availability?date=` | anyone | Every slot that day, free or taken |
-| `POST` | `/bookings` | logged in | Book. Held for 15 minutes until paid; `409` if taken |
-| `GET` | `/bookings/me` | logged in | My bookings |
-| `POST` | `/bookings/:id/cancel` | player or venue owner | Players need 24 h notice; owners can always cancel |
-| `GET` | `/venues/:id/bookings?date=` | venue owner | The venue's agenda for a day |
-| `GET` | `/health` | anyone | Up and connected to the database |
+| `POST` | `/providers` | provider | Create your provider profile (time zone, hours to confirm) |
+| `GET` | `/providers`, `/providers/:id` | anyone | Providers with their services and hours |
+| `PUT` | `/providers/:id/working-hours` | that provider | Replace the weekly schedule |
+| `POST` | `/providers/:id/services` | that provider | Offer a service: duration and price |
+| `GET` | `/providers/:id/availability?serviceId&date` | anyone | Every free start time that day |
+| `POST` | `/appointments` | logged in | Request: `{serviceId, from, to, timeOfDay}` or `{serviceId, startsAt}` |
+| `GET` | `/appointments/me` | logged in | My appointments as a client |
+| `GET` | `/appointments/inbox?status=` | provider | The provider's agenda; `pending` = needs an answer |
+| `POST` | `/appointments/:id/confirm` | that provider | Confirm a pending request |
+| `POST` | `/appointments/:id/reject` | that provider | Reject with a reason |
+| `POST` | `/appointments/:id/cancel` | client or provider | Clients need 12 h notice once confirmed |
+| `GET` | `/notifications` | logged in | My notifications and the unread count |
+| `POST` | `/notifications/read` | logged in | Mark all as read |
 
 <details>
 <summary>Screenshot of the Swagger docs</summary>
@@ -75,56 +92,61 @@ Interactive docs at **`/docs`** (Swagger UI) once the server is running.
 
 </details>
 
+## The life of an appointment
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: POST /appointments
+  pending --> confirmed: provider confirms
+  pending --> rejected: provider rejects (with reason)
+  pending --> expired: no answer in time
+  pending --> cancelled: either side cancels
+  confirmed --> cancelled: client (12 h ahead) or provider
+```
+
+`pending` and `confirmed` hold the time. Every other state frees it.
+
 ## Data model
 
 ```mermaid
 erDiagram
-  USERS ||--o{ VENUES : owns
-  USERS ||--o{ BOOKINGS : makes
-  VENUES ||--o{ COURTS : has
-  COURTS ||--o{ BOOKINGS : "is booked in"
+  USERS ||--o| PROVIDERS : "is a"
+  PROVIDERS ||--o{ WORKING_HOURS : has
+  PROVIDERS ||--o{ SERVICES : offers
+  SERVICES ||--o{ APPOINTMENTS : "booked as"
+  USERS ||--o{ APPOINTMENTS : requests
+  USERS ||--o{ NOTIFICATIONS : receives
 
-  USERS { uuid id PK
-    text email UK
-    text password_hash
-    user_role role }
-  VENUES { uuid id PK
-    uuid owner_id FK
-    text name
-    text timezone }
-  COURTS { uuid id PK
-    uuid venue_id FK
-    sport sport
-    int price_per_hour_cents
-    time opens_at
-    time closes_at
-    int slot_minutes }
-  BOOKINGS { uuid id PK
-    uuid court_id FK
+  PROVIDERS { uuid id PK
     uuid user_id FK
+    text timezone
+    int confirm_within_hours }
+  WORKING_HOURS { uuid provider_id FK
+    int weekday
+    time starts_at
+    time ends_at }
+  SERVICES { uuid id PK
+    int duration_minutes
+    int price_cents }
+  APPOINTMENTS { uuid id PK
     timestamptz starts_at
     timestamptz ends_at
-    booking_status status
-    int price_cents
-    timestamptz expires_at }
-```
-
-```mermaid
-stateDiagram-v2
-  [*] --> pending_payment: POST /bookings
-  pending_payment --> confirmed: payment (next milestone)
-  pending_payment --> expired: 15 min without payment
-  pending_payment --> cancelled: cancel
-  confirmed --> cancelled: cancel
+    appointment_status status
+    timestamptz respond_by
+    text rejection_reason }
+  NOTIFICATIONS { uuid id PK
+    text kind
+    timestamptz read_at }
 ```
 
 ## Engineering decisions
 
-- **SQL instead of an ORM.** The core rule is an exclusion constraint over time ranges, and ORMs don't model that well. Plain SQL keeps the constraint, the transactions and the locks in plain sight. Migrations are numbered `.sql` files, each applied once inside its own transaction.
-- **Store UTC, reason in the venue's time zone.** Timestamps are `timestamptz`. Opening hours and the slot grid are checked in the venue's local time with Luxon. A court opens at 09:00 *in Buenos Aires*, whatever time zone the server runs in.
-- **Unpaid holds expire lazily.** A new booking holds its slot for 15 minutes. Expired holds are marked `expired` inside the same transaction as the next booking attempt on that court, and availability ignores them, so there's no cron job that could fall behind.
-- **No native dependencies.** Passwords use Node's built-in scrypt, so `npm ci` works the same on Windows, macOS, Linux and in the Docker image.
-- **The tests run the real app.** `createApp()` builds the server with the same validation, guards and Swagger setup for production and for tests. The tests only point it at a different database.
+- **The scheduler is pure functions.** `freeSlots()` and `slotProblem()` in `src/scheduling/slots.ts` take hours, busy intervals and "now" as arguments, so they are unit-tested without a database or a clock.
+- **Store UTC, reason in the provider's time zone.** Timestamps are `timestamptz`. Working hours and "afternoon" are interpreted in the provider's zone with Luxon, so a 16:00 class is at 16:00 *in Buenos Aires* wherever the server runs.
+- **Deadlines without a cron job.** A request's `respond_by` is the sooner of the provider's confirmation window and the start time. Overdue requests expire on the next read or write for that provider, in the same transaction. Nothing can fall behind.
+- **Notifications are part of the change.** Each notification is inserted in the same transaction as the state change it reports, so a confirmation can never happen without its notification, and the reverse can't happen either.
+- **SQL instead of an ORM.** The key rules are an exclusion constraint and row locks. Plain SQL keeps them visible. Migrations are numbered `.sql` files, each applied once in its own transaction.
+- **The tests run the real app.** `createApp()` builds the same server, with the same validation, guards and Swagger setup, for production and for tests.
 
 ## Running it
 
@@ -146,24 +168,25 @@ npm run build && npm start         # applies migrations, then serves on :3000
 **Tests** need a PostgreSQL database they can wipe:
 
 ```sh
-TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/courts_test npm test
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appointments_test npm test
 ```
 
 ## Tests
 
-- **Bookings**: price and payment hold; overlapping requests rejected and back-to-back bookings allowed; **25 concurrent requests → 1 booking**; opening hours, the slot grid and past times; expired holds freeing their slot.
-- **Availability**: booked slots are marked; cancelled and expired ones are not.
-- **Cancelling**: the 24-hour rule for players, owner overrides, cancelled slots can be booked again, and strangers get `403`.
-- **Owners**: each owner sees and manages only their own venues.
-- **Auth**: register and login, duplicate emails ignoring case, no account enumeration, no self-made admins, unknown fields rejected.
-- **Schedule** (unit tests): slot generation and every reason a booking time can be rejected.
+- **Auto-scheduling**: picks the first free time matching the preference and skips times held by pending requests. **10 simultaneous requests → 10 distinct times**, then `409` when the day is full.
+- **Exact times**: **25 simultaneous requests for one time → 1 appointment**. Times outside working hours, off the grid or too soon are rejected with a clear reason.
+- **Provider answers**: confirm and reject notify the client; a request can't be answered twice; only the right provider can answer; overdue requests expire and free their time.
+- **Cancelling**: clients cancel pending requests anytime and confirmed ones with 12 h notice; providers can always cancel; strangers get `403`.
+- **Providers**: working-hours and service validation, ownership checks, availability that shrinks as requests come in.
+- **Scheduler** (unit tests): the grid, lunch breaks, time of day, busy overlaps, notice, multi-day windows and days off.
+- **Auth**: register and login, duplicate emails ignoring case, no account enumeration, no self-made admins.
 
 ## Roadmap
 
-- [ ] Payments with Mercado Pago: an idempotent webhook that confirms a hold exactly once, even if the notification arrives twice.
-- [ ] Deploy (Render / Fly.io) with a public demo URL.
-- [ ] Connect it to CoordeFutbol so a match can book its pitch.
+- [ ] Deploy (Render + Neon) so the portal's playground works without running anything locally.
+- [ ] Email or WhatsApp delivery for notifications.
+- [ ] Reschedule: the provider proposes another time instead of only rejecting.
 
 ## Stack
 
-Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, raw SQL) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · Docker · GitHub Actions
+Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, raw SQL) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal) · Docker · GitHub Actions

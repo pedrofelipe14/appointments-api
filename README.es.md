@@ -1,132 +1,121 @@
 <div align="center">
 
-# Court Booking API
+# Appointments API
 
-**Una API REST para reservar canchas de fútbol donde es imposible reservar dos veces el mismo turno, incluso bajo carga.**
+**El cliente pide "esta semana, a la tarde", la API le asigna un horario libre y el profesional lo confirma. Nunca se dan dos turnos a la misma hora, aunque los pedidos lleguen en el mismo instante.**
 
 [English](README.md) · **Español**
 
-[![CI](https://github.com/pedrofelipe14/court-booking-api/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrofelipe14/court-booking-api/actions/workflows/ci.yml)
+[![CI](https://github.com/pedrofelipe14/appointments-api/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrofelipe14/appointments-api/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/Node-24-339933?logo=nodedotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-27_pasando-2ea44f)
+![Tests](https://img.shields.io/badge/tests-28_passing-2ea44f)
+
+![Diez clientes piden turno en el mismo instante y reciben diez horarios distintos](docs/race.png)
 
 </div>
 
-**Portal para desarrolladores:** [pedrofelipe14.github.io/court-booking-api](https://pedrofelipe14.github.io/court-booking-api/) tiene una guía rápida con ejemplos en curl, JavaScript y Python, una guía de integración, una referencia generada sola y un playground en vivo.
+**Portal para desarrolladores:** [pedrofelipe14.github.io/appointments-api](https://pedrofelipe14.github.io/appointments-api/) tiene una guía rápida con ejemplos en curl, JavaScript y Python, una guía de integración, la referencia generada automáticamente y un playground en vivo. La imagen de arriba sale de ese playground: 10 clientes piden turno a la vez en un día que tiene 10 horarios libres.
 
-Los dueños de un complejo publican sus canchas y horarios. Los jugadores ven qué turnos quedan libres en vivo, reservan y pueden cancelar con anticipación. Es el backend que necesita mi app [CoordeFutbol](https://github.com/pedrofelipe14/coordenadas-futbol), que organiza partidos entre amigos, para reservar la cancha.
+Es el backend para cualquier negocio que trabaja con turnos: una profe de guitarra, una peluquería, un kinesiólogo, un profesor particular.
 
-## Qué demuestra este proyecto
+1. El **profesional** publica sus servicios (duración y precio) y su horario semanal.
+2. El **cliente** no busca en una grilla: dice qué días y qué parte del día le sirven, y la API **le asigna el primer horario libre**. También puede pedir un horario exacto.
+3. El pedido queda **pendiente** y guarda el horario hasta que el profesional lo **confirma** o lo **rechaza** con un motivo.
+4. Si nadie responde a tiempo (24 h por defecto), el pedido **vence** y el horario se libera.
+5. Las dos partes reciben **notificaciones** en cada paso.
+
+## Qué muestra este proyecto
 
 | | |
 |---|---|
-| **Concurrencia bien resuelta** | **25 pedidos simultáneos** por el mismo turno: exactamente **uno** consigue la reserva y los otros 24 reciben `409 Conflict`. Lo garantiza una *exclusion constraint* de PostgreSQL, no un chequeo en el código que se puede pisar. |
-| **SQL y modelado de datos** | Migraciones escritas a mano, enums, *check constraints*, una *exclusion constraint* GiST sobre rangos de tiempo y bloqueo de filas (`FOR UPDATE`) donde hace falta. |
-| **Login y seguridad** | JWT con roles (jugador, dueño y admin) y contraseñas con scrypt, comparadas en tiempo constante. El login da el mismo error para una contraseña mal y para un email que no existe. Los pedidos con campos de más se rechazan. |
-| **Reglas de negocio** | Zonas horarias, grilla de turnos, horarios de apertura, reservas sin pagar que vencen y 24 horas de anticipación para que un jugador cancele. |
-| **Tests** | **27 tests**, la mayoría end-to-end por HTTP contra un **PostgreSQL real**: la base no está simulada. |
-| **Entrega** | Documentación OpenAPI/Swagger, Dockerfile, `docker compose up` y CI con un PostgreSQL que además compila la imagen de Docker. |
-| **Experiencia para desarrolladores** | Un portal bilingüe: guía rápida, guía de integración, una referencia que se genera desde la especificación OpenAPI en cada build (así nunca queda desactualizada) y un playground que corre escenarios reales contra la API, incluida la carrera de 25 pedidos. |
+| **Concurrencia bien resuelta** | **10 pedidos simultáneos de "el primer horario libre" reciben 10 horarios distintos**, y el 11.º recibe `409`. Con un horario exacto, **25 pedidos simultáneos generan un solo turno**. |
+| **Lógica de agenda** | Horarios semanales con varios rangos por día, grilla de 15 minutos, preferencia de parte del día, anticipación mínima y zonas horarias. Todo en funciones puras con tests unitarios. |
+| **SQL y modelado** | Migraciones escritas a mano, enums, check constraints, una exclusion constraint GiST sobre rangos de tiempo y bloqueos de fila (`FOR UPDATE`, `FOR NO KEY UPDATE`). |
+| **Un flujo real** | Una máquina de estados (pendiente → confirmado / rechazado / vencido / cancelado), plazos, reglas de cancelación por rol y notificaciones escritas en la misma transacción que el cambio que informan. |
+| **Autenticación y seguridad** | JWT con roles (cliente, profesional, admin), contraseñas con scrypt, el mismo error para contraseña incorrecta y email inexistente, y rechazo de campos inesperados. |
+| **Testing** | **28 tests**, casi todos de punta a punta por HTTP contra un **PostgreSQL real**. No hay nada mockeado. |
+| **Entrega** | Documentación OpenAPI/Swagger, Dockerfile, `docker compose up`, CI con un servicio de PostgreSQL y un portal bilingüe publicado en GitHub Pages. |
 
-## Lo difícil: que no haya dos reservas para el mismo turno
+## Lo difícil: diez clientes en el mismo segundo
 
-Dos jugadores tocan "reservar" en el mismo turno en el mismo instante. Primero chequear ("¿está libre?") y después insertar no alcanza, porque los dos chequeos pasan antes de que llegue cualquiera de los dos inserts.
+Diez clientes piden "el primer horario libre del viernes" en el mismo momento. La implementación ingenua calcula los horarios libres y después inserta: los diez ven las 09:00 libres y los diez intentan quedarse con las 09:00.
 
-Por eso la regla vive en la base de datos (`migrations/001_init.sql`):
+Lo resuelven dos capas:
 
 ```sql
-constraint bookings_no_overlap exclude using gist (
-  court_id with =,
+-- 1. Los pedidos para un mismo profesional toman turno (appointments.service.ts).
+--    Cada uno ve lo que tomó el anterior, así que recibe el siguiente horario libre.
+select 1 from providers where id = $1 for no key update;
+
+-- 2. Y la base rechaza superposiciones igual (migrations/001_init.sql).
+constraint appointments_no_overlap exclude using gist (
+  provider_id with =,
   tstzrange(starts_at, ends_at, '[)') with &&
-) where (status in ('pending_payment', 'confirmed'))
+) where (status in ('pending', 'confirmed'))
 ```
 
-PostgreSQL no permite dos reservas activas con horarios superpuestos en la misma cancha, sin importar en qué orden corran las transacciones. La API traduce ese error (`23P01`) a un `409 Conflict`. Con los rangos semiabiertos `[)`, una reserva que termina a las 20:00 no choca con una que empieza a las 20:00. Las reservas canceladas o vencidas dejan de contar, así que su turno se libera.
+El bloqueo solo pone en fila los pedidos **del mismo profesional**: los de profesionales distintos corren en paralelo. `FOR NO KEY UPDATE` no frena los chequeos de claves foráneas de otros inserts.
 
-Los tests mandan 25 pedidos simultáneos al mismo turno y verifican que se guardó una sola fila.
+La exclusion constraint es la garantía final. Si algún camino del código intentara guardar dos turnos activos que se superponen, PostgreSQL lo rechazaría (`23P01` → `409`). Con rangos semiabiertos `[)`, un turno que termina a las 10:00 puede ir pegado a uno que empieza a las 10:00.
+
+¿Por qué no alcanza con la constraint sola? Fue lo primero que probé, y los tests encontraron el problema. Cuando dos inserts concurrentes chocan en una exclusion constraint, cada uno espera al otro, y PostgreSQL lo resuelve abortando uno con un error de **deadlock** (`40P01`), no con un conflicto limpio. Poner en fila los pedidos de cada profesional elimina el deadlock.
 
 ## API
 
 Documentación interactiva en **`/docs`** (Swagger UI) con el servidor corriendo.
 
-| Método | Ruta | Quién | Qué hace |
+| Método | Ruta | Quién | Qué |
 |---|---|---|---|
-| `POST` | `/auth/register` | cualquiera | Crear una cuenta de jugador o de dueño |
-| `POST` | `/auth/login` | cualquiera | Obtener un JWT (dura 1 h) |
+| `POST` | `/auth/register`, `/auth/login` | cualquiera | Crear una cuenta de cliente o profesional y obtener un JWT |
 | `GET` | `/auth/me` | con sesión | El usuario actual |
-| `POST` | `/venues` | dueño, admin | Crear un complejo (con su zona horaria) |
-| `GET` | `/venues`, `/venues/:id` | cualquiera | Ver complejos |
-| `POST` | `/venues/:id/courts` | dueño del complejo | Sumar una cancha: deporte, precio por hora, horarios y largo del turno |
-| `GET` | `/venues/:id/courts`, `/courts/:id` | cualquiera | Ver canchas |
-| `GET` | `/courts/:id/availability?date=` | cualquiera | Todos los turnos del día, libres u ocupados |
-| `POST` | `/bookings` | con sesión | Reservar. Se guarda 15 minutos hasta que se pague; `409` si está ocupado |
-| `GET` | `/bookings/me` | con sesión | Mis reservas |
-| `POST` | `/bookings/:id/cancel` | jugador o dueño | El jugador necesita 24 h de anticipación; el dueño puede cancelar siempre |
-| `GET` | `/venues/:id/bookings?date=` | dueño del complejo | La agenda del complejo para un día |
-| `GET` | `/health` | cualquiera | Funciona y llega a la base de datos |
+| `POST` | `/providers` | profesional | Crear el perfil (zona horaria, horas para confirmar) |
+| `GET` | `/providers`, `/providers/:id` | cualquiera | Profesionales con sus servicios y horarios |
+| `PUT` | `/providers/:id/working-hours` | ese profesional | Reemplazar el horario semanal |
+| `POST` | `/providers/:id/services` | ese profesional | Ofrecer un servicio: duración y precio |
+| `GET` | `/providers/:id/availability?serviceId&date` | cualquiera | Cada horario libre de ese día |
+| `POST` | `/appointments` | con sesión | Pedir turno: `{serviceId, from, to, timeOfDay}` o `{serviceId, startsAt}` |
+| `GET` | `/appointments/me` | con sesión | Mis turnos como cliente |
+| `GET` | `/appointments/inbox?status=` | profesional | La agenda del profesional; `pending` = por responder |
+| `POST` | `/appointments/:id/confirm` | ese profesional | Confirmar un pedido |
+| `POST` | `/appointments/:id/reject` | ese profesional | Rechazar con un motivo |
+| `POST` | `/appointments/:id/cancel` | cliente o profesional | El cliente necesita 12 h de anticipación si ya estaba confirmado |
+| `GET` | `/notifications` | con sesión | Mis notificaciones y cuántas no leí |
+| `POST` | `/notifications/read` | con sesión | Marcar todas como leídas |
 
 <details>
-<summary>Captura de la documentación Swagger</summary>
+<summary>Captura de la documentación en Swagger</summary>
 
 ![Swagger UI](docs/swagger.png)
 
 </details>
 
-## Modelo de datos
-
-```mermaid
-erDiagram
-  USERS ||--o{ VENUES : owns
-  USERS ||--o{ BOOKINGS : makes
-  VENUES ||--o{ COURTS : has
-  COURTS ||--o{ BOOKINGS : "is booked in"
-
-  USERS { uuid id PK
-    text email UK
-    text password_hash
-    user_role role }
-  VENUES { uuid id PK
-    uuid owner_id FK
-    text name
-    text timezone }
-  COURTS { uuid id PK
-    uuid venue_id FK
-    sport sport
-    int price_per_hour_cents
-    time opens_at
-    time closes_at
-    int slot_minutes }
-  BOOKINGS { uuid id PK
-    uuid court_id FK
-    uuid user_id FK
-    timestamptz starts_at
-    timestamptz ends_at
-    booking_status status
-    int price_cents
-    timestamptz expires_at }
-```
+## La vida de un turno
 
 ```mermaid
 stateDiagram-v2
-  [*] --> pending_payment: POST /bookings
-  pending_payment --> confirmed: pago (próxima etapa)
-  pending_payment --> expired: 15 min sin pagar
-  pending_payment --> cancelled: cancelar
-  confirmed --> cancelled: cancelar
+  [*] --> pending: POST /appointments
+  pending --> confirmed: el profesional confirma
+  pending --> rejected: el profesional rechaza (con motivo)
+  pending --> expired: nadie respondió a tiempo
+  pending --> cancelled: cualquiera de los dos cancela
+  confirmed --> cancelled: el cliente (con 12 h) o el profesional
 ```
 
-## Decisiones técnicas
+`pending` y `confirmed` ocupan el horario. Los demás estados lo liberan.
 
-- **SQL en lugar de un ORM.** La regla central es una *exclusion constraint* sobre rangos de tiempo, y los ORMs no la modelan bien. Con SQL directo, la constraint, las transacciones y los bloqueos quedan a la vista. Las migraciones son archivos `.sql` numerados, y cada uno se aplica una sola vez dentro de su propia transacción.
-- **Guardar en UTC, razonar en la hora del complejo.** Las fechas se guardan como `timestamptz`. Los horarios de apertura y la grilla de turnos se validan en la hora local del complejo con Luxon. Una cancha abre a las 09:00 *de Buenos Aires*, sin importar la zona horaria del servidor.
-- **Las reservas sin pagar vencen solas.** Una reserva nueva guarda el turno 15 minutos. Las vencidas se marcan `expired` dentro de la misma transacción del siguiente intento de reserva en esa cancha, y la disponibilidad ya las ignora. No hay una tarea programada que se pueda atrasar.
-- **Sin dependencias nativas.** Las contraseñas usan el scrypt que viene con Node, así `npm ci` funciona igual en Windows, macOS, Linux y en la imagen de Docker.
-- **Los tests corren la app real.** `createApp()` arma el servidor con la misma validación, guards y Swagger para producción y para los tests. Lo único que cambia en los tests es la base de datos.
+## Decisiones de ingeniería
 
-## Correrlo
+- **La agenda son funciones puras.** `freeSlots()` y `slotProblem()` en `src/scheduling/slots.ts` reciben horarios, intervalos ocupados y "ahora" como argumentos, así que se testean sin base de datos y sin reloj.
+- **Guardar en UTC, razonar en la zona del profesional.** Las fechas son `timestamptz`. El horario de trabajo y "a la tarde" se interpretan en la zona del profesional con Luxon, así que una clase de las 16:00 es a las 16:00 *de Buenos Aires*, corra donde corra el servidor.
+- **Plazos sin cron.** El `respond_by` de un pedido es lo que llegue primero entre el plazo para confirmar y el inicio del turno. Los pedidos vencidos se marcan en la siguiente lectura o escritura de ese profesional, dentro de la misma transacción. Nada puede quedar atrasado.
+- **Las notificaciones son parte del cambio.** Cada notificación se inserta en la misma transacción que el cambio de estado que informa. Una confirmación nunca existe sin su notificación, y al revés tampoco.
+- **SQL en lugar de un ORM.** Las reglas clave son una exclusion constraint y bloqueos de fila, y con SQL directo quedan a la vista. Las migraciones son archivos `.sql` numerados, cada uno aplicado una sola vez en su propia transacción.
+- **Los tests corren la app real.** `createApp()` arma el mismo servidor, con la misma validación, los mismos guards y el mismo Swagger, para producción y para los tests.
+
+## Cómo correrlo
 
 **Con Docker** (API y PostgreSQL):
 
@@ -138,32 +127,33 @@ docker compose up --build
 **Sin Docker**, con tu propio PostgreSQL 14 o más nuevo:
 
 ```sh
-cp .env.example .env               # completar DATABASE_URL y JWT_SECRET
+cp .env.example .env               # completá DATABASE_URL y JWT_SECRET
 npm install
-npm run build && npm start         # aplica las migraciones y levanta en :3000
+npm run build && npm start         # aplica las migraciones y escucha en :3000
 ```
 
 **Los tests** necesitan una base de PostgreSQL que puedan borrar:
 
 ```sh
-TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/courts_test npm test
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appointments_test npm test
 ```
 
 ## Tests
 
-- **Reservas**: precio y tiempo de espera del pago; superposiciones rechazadas y reservas pegadas permitidas; **25 pedidos simultáneos → 1 reserva**; horarios de apertura, grilla de turnos y horarios pasados; turnos liberados cuando vence una reserva sin pagar.
-- **Disponibilidad**: los turnos reservados aparecen ocupados; los cancelados y vencidos, no.
-- **Cancelaciones**: la regla de 24 horas para jugadores, el dueño que puede cancelar igual, turnos cancelados que se pueden volver a reservar, y `403` para quien no tiene nada que ver.
-- **Dueños**: cada dueño ve y administra solo sus complejos.
-- **Login**: registro e inicio de sesión, emails repetidos sin importar mayúsculas, sin forma de adivinar qué emails existen, sin admins creados por uno mismo, campos de más rechazados.
-- **Horarios** (tests unitarios): generación de turnos y cada motivo por el que se rechaza un horario.
+- **Agenda automática**: elige el primer horario libre según la preferencia y saltea los que ocupan pedidos pendientes. **10 pedidos simultáneos → 10 horarios distintos**, y `409` cuando el día está lleno.
+- **Horarios exactos**: **25 pedidos simultáneos por el mismo horario → 1 turno**. Los horarios fuera del horario de trabajo, fuera de la grilla o demasiado pronto se rechazan con un motivo claro.
+- **Respuestas del profesional**: confirmar y rechazar notifican al cliente; un pedido no se responde dos veces; solo responde el profesional correcto; los pedidos vencidos liberan su horario.
+- **Cancelaciones**: el cliente cancela un pendiente cuando quiera y un confirmado con 12 h; el profesional cancela siempre; un extraño recibe `403`.
+- **Profesionales**: validación de horarios y servicios, permisos sobre el propio perfil, y una disponibilidad que se achica a medida que entran pedidos.
+- **Agenda** (tests unitarios): la grilla, el corte del mediodía, la parte del día, superposiciones, la anticipación, búsquedas de varios días y días libres.
+- **Autenticación**: registro y login, emails duplicados sin importar mayúsculas, sin enumeración de cuentas y sin admins autoproclamados.
 
 ## Próximos pasos
 
-- [ ] Pagos con Mercado Pago: un webhook idempotente que confirma la reserva una sola vez aunque el aviso llegue repetido.
-- [ ] Deploy (Render / Fly.io) con una URL pública de demo.
-- [ ] Conectarla con CoordeFutbol para que un partido reserve su cancha.
+- [ ] Publicarla (Render + Neon) para que el playground del portal funcione sin correr nada localmente.
+- [ ] Mandar las notificaciones por email o WhatsApp.
+- [ ] Reprogramar: que el profesional proponga otro horario en lugar de solo rechazar.
 
 ## Stack
 
-Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, SQL directo) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · Docker · GitHub Actions
+Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, SQL directo) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal) · Docker · GitHub Actions
