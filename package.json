@@ -9,7 +9,8 @@
     "dev": "tsx watch src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "openapi": "npm run build && node dist/openapi.js site/public/openapi.json"
   },
   "dependencies": {
     "@nestjs/common": "^12.3.2",

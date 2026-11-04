@@ -17,6 +17,8 @@ export async function createApp(config: AppConfig): Promise<INestApplication> {
     }),
   )
   app.enableShutdownHooks()
+  // The developer portal's playground calls the API from the browser.
+  app.enableCors({ origin: config.corsOrigins.length ? config.corsOrigins : true })
 
   const docs = new DocumentBuilder()
     .setTitle('Court Booking API')

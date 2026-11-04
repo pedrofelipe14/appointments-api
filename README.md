@@ -15,6 +15,8 @@
 
 </div>
 
+**Developer portal:** [pedrofelipe14.github.io/court-booking-api](https://pedrofelipe14.github.io/court-booking-api/) has a quickstart with curl, JavaScript and Python examples, an integration guide, an auto-generated reference and a live playground.
+
 Venue owners publish their courts and opening hours. Players see live availability, book a slot and cancel with enough notice. It's the backend that my app [CoordeFutbol](https://github.com/pedrofelipe14/coordenadas-futbol), which organizes matches among friends, needs in order to book the pitch.
 
 ## What this project shows
@@ -27,6 +29,7 @@ Venue owners publish their courts and opening hours. Players see live availabili
 | **Domain rules** | Time zones, a slot grid, opening hours, unpaid holds that expire, and a 24-hour notice before a player can cancel. |
 | **Testing** | **27 tests**, mostly end-to-end over HTTP against a **real PostgreSQL**: no mocked database. |
 | **Delivery** | OpenAPI/Swagger docs, a Dockerfile, `docker compose up`, and CI with a PostgreSQL service that also builds the Docker image. |
+| **Developer experience** | A bilingual developer portal: quickstart, integration guide, a reference generated from the OpenAPI spec on every build (so it never drifts from the code), and a playground that runs real scenarios against the API, including the 25-request race. |
 
 ## The hard part: no double bookings
 

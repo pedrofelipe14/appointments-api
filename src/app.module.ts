@@ -1,5 +1,5 @@
 import { Controller, Get, Module, type DynamicModule } from '@nestjs/common'
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger'
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { AuthModule } from './auth/auth.module'
 import { BookingsController } from './bookings/bookings.controller'
 import { BookingsService } from './bookings/bookings.service'
@@ -16,6 +16,7 @@ class HealthController {
   constructor(private readonly db: Database) {}
 
   @Get()
+  @ApiOperation({ summary: 'Health check' })
   @ApiOkResponse({ description: 'The API is up and can reach the database' })
   async check(): Promise<{ status: 'ok' }> {
     await this.db.query('select 1')

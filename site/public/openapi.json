@@ -1,0 +1,929 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The API is up and can reach the database"
+          }
+        },
+        "summary": "Health check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/venues": {
+      "post": {
+        "description": "Its time zone defines what \"09:00\" means for its courts.",
+        "operationId": "VenuesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVenueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: owner or admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a venue",
+        "tags": [
+          "venues"
+        ]
+      },
+      "get": {
+        "operationId": "VenuesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VenueResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List venues",
+        "tags": [
+          "venues"
+        ]
+      }
+    },
+    "/venues/{id}": {
+      "get": {
+        "operationId": "VenuesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenueResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Venue not found"
+          }
+        },
+        "summary": "Get a venue",
+        "tags": [
+          "venues"
+        ]
+      }
+    },
+    "/venues/{venueId}/courts": {
+      "post": {
+        "description": "Sport, price per hour, opening hours and slot length.",
+        "operationId": "CourtsController_create",
+        "parameters": [
+          {
+            "name": "venueId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCourtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourtResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: owner or admin"
+          },
+          "409": {
+            "description": "Court name already used in this venue"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a court to your venue",
+        "tags": [
+          "courts"
+        ]
+      },
+      "get": {
+        "operationId": "CourtsController_list",
+        "parameters": [
+          {
+            "name": "venueId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CourtResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Venue not found"
+          }
+        },
+        "summary": "List the courts of a venue",
+        "tags": [
+          "courts"
+        ]
+      }
+    },
+    "/courts/{id}": {
+      "get": {
+        "operationId": "CourtsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourtResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Court not found"
+          }
+        },
+        "summary": "Get a court",
+        "tags": [
+          "courts"
+        ]
+      }
+    },
+    "/courts/{id}/availability": {
+      "get": {
+        "description": "Every slot of the local date, with whether it can still be booked.",
+        "operationId": "CourtsController_availability",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "Local date at the venue (YYYY-MM-DD)",
+            "schema": {
+              "example": "2026-11-20",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every slot of the day and whether it can still be booked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SlotResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Availability for a day",
+        "tags": [
+          "courts"
+        ]
+      }
+    },
+    "/bookings": {
+      "post": {
+        "description": "Held for 15 minutes until paid. Overlapping requests get 409, even when they arrive at the same instant.",
+        "operationId": "BookingsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Booked; holds the slot until paid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Outside opening hours, off the slot grid, or in the past"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "409": {
+            "description": "That time is already booked"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Book a slot",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/me": {
+      "get": {
+        "operationId": "BookingsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My bookings",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}/cancel": {
+      "post": {
+        "description": "Players need 24 hours of notice; the venue owner can always cancel.",
+        "operationId": "BookingsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Booking not found"
+          },
+          "409": {
+            "description": "Already cancelled/expired, or too close to start for a player to cancel"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a booking",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/venues/{venueId}/bookings": {
+      "get": {
+        "description": "For the venue owner: the agenda of a local date.",
+        "operationId": "BookingsController_forVenue",
+        "parameters": [
+          {
+            "name": "venueId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "Local date at the venue (YYYY-MM-DD)",
+            "schema": {
+              "example": "2026-11-20",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All bookings at the venue on that local date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Requires role: owner or admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A venue's bookings for a day",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "description": "Players book courts; owners publish venues and courts.",
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already registered"
+          }
+        },
+        "summary": "Create an account",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "description": "Returns a JWT valid for one hour. Send it as `Authorization: Bearer <token>`.",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password"
+          }
+        },
+        "summary": "Log in",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The current user",
+        "tags": [
+          "auth"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Court Booking API",
+    "description": "Book football courts: venues, courts, live availability and bookings that can never overlap.",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "CreateVenueDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Complejo La Bombonerita"
+          },
+          "address": {
+            "type": "string",
+            "example": "Av. Siempre Viva 742, Mar del Plata"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "America/Argentina/Buenos_Aires",
+            "default": "America/Argentina/Buenos_Aires"
+          }
+        },
+        "required": [
+          "name",
+          "address"
+        ]
+      },
+      "VenueResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "timezone",
+          "ownerId"
+        ]
+      },
+      "CreateCourtDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Cancha 1"
+          },
+          "sport": {
+            "type": "string",
+            "enum": [
+              "futbol5",
+              "futbol7",
+              "futbol11"
+            ]
+          },
+          "pricePerHourCents": {
+            "type": "number",
+            "example": 4500000,
+            "description": "Price per hour in cents (ARS 45,000.00)"
+          },
+          "opensAt": {
+            "type": "string",
+            "example": "09:00",
+            "description": "Local opening time (HH:MM)"
+          },
+          "closesAt": {
+            "type": "string",
+            "example": "23:00",
+            "description": "Local closing time (HH:MM), after opensAt"
+          },
+          "slotMinutes": {
+            "type": "number",
+            "enum": [
+              30,
+              60,
+              90,
+              120
+            ],
+            "default": 60
+          }
+        },
+        "required": [
+          "name",
+          "sport",
+          "pricePerHourCents",
+          "opensAt",
+          "closesAt"
+        ]
+      },
+      "CourtResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "venueId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sport": {
+            "type": "string",
+            "enum": [
+              "futbol5",
+              "futbol7",
+              "futbol11"
+            ]
+          },
+          "pricePerHourCents": {
+            "type": "number"
+          },
+          "opensAt": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "closesAt": {
+            "type": "string",
+            "example": "23:00"
+          },
+          "slotMinutes": {
+            "type": "number"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "venueId",
+          "name",
+          "sport",
+          "pricePerHourCents",
+          "opensAt",
+          "closesAt",
+          "slotMinutes",
+          "timezone"
+        ]
+      },
+      "SlotResponse": {
+        "type": "object",
+        "properties": {
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "startsAt",
+          "endsAt",
+          "available"
+        ]
+      },
+      "CreateBookingDto": {
+        "type": "object",
+        "properties": {
+          "courtId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-11-20T20:00:00-03:00",
+            "description": "ISO 8601 with offset; must fall on a slot boundary"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "example": 60,
+            "description": "A multiple of the court slot length, up to 180"
+          }
+        },
+        "required": [
+          "courtId",
+          "startsAt",
+          "durationMinutes"
+        ]
+      },
+      "BookingResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "courtId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_payment",
+              "confirmed",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "priceCents": {
+            "type": "number",
+            "description": "Total price in cents"
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true,
+            "description": "An unpaid booking stops holding the slot after this"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "courtId",
+          "userId",
+          "startsAt",
+          "endsAt",
+          "status",
+          "priceCents",
+          "expiresAt",
+          "createdAt"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "lio@example.com"
+          },
+          "name": {
+            "type": "string",
+            "example": "Lio"
+          },
+          "password": {
+            "type": "string",
+            "example": "a-long-password",
+            "minLength": 8
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "player",
+              "owner"
+            ],
+            "default": "player",
+            "description": "Owners can list venues and courts. Admins are never self-registered."
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "password"
+        ]
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "player",
+              "owner",
+              "admin"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "lio@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "a-long-password"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 3600
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresIn"
+        ]
+      }
+    }
+  }
+}

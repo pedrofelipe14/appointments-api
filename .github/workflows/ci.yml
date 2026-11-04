@@ -6,8 +6,17 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  api:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -37,3 +46,42 @@ jobs:
         run: npm run build
       - name: Docker image builds
         run: docker build -t court-booking-api .
+
+  portal:
+    needs: api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+      - run: npm ci
+      # The reference on the portal is regenerated from the API code on every build.
+      - name: Export the OpenAPI spec from the code
+        run: npm run openapi
+      - name: Portal typecheck, tests and build
+        working-directory: site
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: site/dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: portal
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

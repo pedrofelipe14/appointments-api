@@ -15,6 +15,8 @@
 
 </div>
 
+**Portal para desarrolladores:** [pedrofelipe14.github.io/court-booking-api](https://pedrofelipe14.github.io/court-booking-api/) tiene una guía rápida con ejemplos en curl, JavaScript y Python, una guía de integración, una referencia generada sola y un playground en vivo.
+
 Los dueños de un complejo publican sus canchas y horarios. Los jugadores ven qué turnos quedan libres en vivo, reservan y pueden cancelar con anticipación. Es el backend que necesita mi app [CoordeFutbol](https://github.com/pedrofelipe14/coordenadas-futbol), que organiza partidos entre amigos, para reservar la cancha.
 
 ## Qué demuestra este proyecto
@@ -27,6 +29,7 @@ Los dueños de un complejo publican sus canchas y horarios. Los jugadores ven qu
 | **Reglas de negocio** | Zonas horarias, grilla de turnos, horarios de apertura, reservas sin pagar que vencen y 24 horas de anticipación para que un jugador cancele. |
 | **Tests** | **27 tests**, la mayoría end-to-end por HTTP contra un **PostgreSQL real**: la base no está simulada. |
 | **Entrega** | Documentación OpenAPI/Swagger, Dockerfile, `docker compose up` y CI con un PostgreSQL que además compila la imagen de Docker. |
+| **Experiencia para desarrolladores** | Un portal bilingüe: guía rápida, guía de integración, una referencia que se genera desde la especificación OpenAPI en cada build (así nunca queda desactualizada) y un playground que corre escenarios reales contra la API, incluida la carrera de 25 pedidos. |
 
 ## Lo difícil: que no haya dos reservas para el mismo turno
 

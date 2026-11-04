@@ -2,6 +2,8 @@ export interface AppConfig {
   databaseUrl: string
   jwtSecret: string
   port: number
+  /** Browser origins allowed to call the API (CORS); empty means any origin. */
+  corsOrigins: string[]
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG')
@@ -19,5 +21,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUrl: required('DATABASE_URL'),
     jwtSecret,
     port: Number(env.PORT ?? 3000),
+    corsOrigins: (env.CORS_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean),
   }
 }

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common'
-import { ApiConflictResponse, ApiCreatedResponse, ApiOkResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger'
+import { ApiConflictResponse, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger'
 import { LoginDto, RegisterDto, TokenResponse, UserResponse } from './auth.dto'
 import { Auth, CurrentUser } from './auth.guard'
 import { AuthService } from './auth.service'
@@ -11,6 +11,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('register')
+  @ApiOperation({ summary: 'Create an account', description: 'Players book courts; owners publish venues and courts.' })
   @ApiCreatedResponse({ type: UserResponse })
   @ApiConflictResponse({ description: 'Email already registered' })
   register(@Body() dto: RegisterDto): Promise<UserResponse> {
@@ -18,6 +19,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @ApiOperation({ summary: 'Log in', description: 'Returns a JWT valid for one hour. Send it as `Authorization: Bearer <token>`.' })
   @HttpCode(200)
   @ApiOkResponse({ type: TokenResponse })
   @ApiUnauthorizedResponse({ description: 'Invalid email or password' })
@@ -26,6 +28,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiOperation({ summary: 'The current user' })
   @Auth()
   @ApiOkResponse({ type: UserResponse })
   me(@CurrentUser() user: AuthUser): Promise<UserResponse> {

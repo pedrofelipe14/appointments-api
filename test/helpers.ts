@@ -18,7 +18,7 @@ export interface TestContext {
 export async function startApp(): Promise<TestContext> {
   const pool = new Pool({ connectionString: TEST_DATABASE_URL })
   await migrate(pool)
-  const app = await createApp({ databaseUrl: TEST_DATABASE_URL, jwtSecret: 'test-secret-that-is-long-enough', port: 0 })
+  const app = await createApp({ databaseUrl: TEST_DATABASE_URL, jwtSecret: 'test-secret-that-is-long-enough', port: 0, corsOrigins: [] })
   await app.init()
   return { app, pool, http: () => request(app.getHttpServer()) }
 }
