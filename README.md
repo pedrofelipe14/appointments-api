@@ -2,9 +2,9 @@
 
 # Appointments API
 
-**Clients ask for "this week, in the afternoon". The API picks a free time and the provider confirms it. Two appointments never land on the same time, even when the requests arrive in the same instant.**
+**El cliente pide "esta semana, a la tarde", la API le asigna un horario libre y el profesional lo confirma. Nunca se dan dos turnos a la misma hora, aunque los pedidos lleguen en el mismo instante.**
 
-**English** · [Español](README.es.md)
+**Español** · [English](README.en.md)
 
 [![CI](https://github.com/pedrofelipe14/appointments-api/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrofelipe14/appointments-api/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/Node-24-339933?logo=nodedotjs&logoColor=white)
@@ -13,159 +13,126 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-28_passing-2ea44f)
 
-![Ten clients request at the same instant and get ten different times](docs/race.png)
+![Diez clientes piden turno en el mismo instante y reciben diez horarios distintos](docs/race.png)
 
 </div>
 
-**Developer portal:** [pedrofelipe14.github.io/appointments-api](https://pedrofelipe14.github.io/appointments-api/) has a quickstart with curl, JavaScript and Python examples, an integration guide, an auto-generated reference and a live playground. The image above comes from that playground: 10 clients request a time on a day with 10 free times, all at once.
+**Portal para desarrolladores:** [pedrofelipe14.github.io/appointments-api](https://pedrofelipe14.github.io/appointments-api/) tiene una guía rápida con ejemplos en curl, JavaScript y Python, una guía de integración, la referencia generada automáticamente y un playground en vivo. La imagen de arriba sale de ese playground: 10 clientes piden turno a la vez en un día que tiene 10 horarios libres.
 
-The API is a backend for any business that works by appointment: a guitar teacher, a hairdresser, a physio, a tutor.
+Es el backend para cualquier negocio que trabaja con turnos: una profe de guitarra, una peluquería, un kinesiólogo, un profesor particular.
 
-1. The **provider** publishes services (duration and price) and weekly working hours.
-2. The **client** doesn't hunt through a grid. They say which days and which part of the day suit them, and the API **assigns the first free time**. They can still ask for an exact time.
-3. The request stays **pending** and holds the time until the provider **confirms** it or **rejects** it with a reason.
-4. If nobody answers in time (24 h by default), the request **expires** and the time frees up.
-5. Both sides get **notifications** at every step.
+1. El **profesional** publica sus servicios (duración y precio) y su horario semanal.
+2. El **cliente** no busca en una grilla: dice qué días y qué parte del día le sirven, y la API **le asigna el primer horario libre**. También puede pedir un horario exacto.
+3. El pedido queda **pendiente** y guarda el horario hasta que el profesional lo **confirma** o lo **rechaza** con un motivo.
+4. Si nadie responde a tiempo (24 h por defecto), el pedido **vence** y el horario se libera.
+5. Las dos partes reciben **notificaciones** en cada paso.
 
-## What this project shows
+## Qué muestra este proyecto
 
 | | |
 |---|---|
-| **Concurrency done right** | **10 simultaneous "first free time" requests get 10 different times**, and an 11th gets `409`. With an exact time, **25 simultaneous requests produce exactly one appointment**. |
-| **Scheduling logic** | Weekly hours with several ranges per day, a 15-minute grid, time-of-day preferences, minimum notice, and time zones. It is all pure, unit-tested functions. |
-| **SQL and data modelling** | Hand-written migrations, enums, check constraints, a GiST exclusion constraint over time ranges, and row locks (`FOR UPDATE`, `FOR NO KEY UPDATE`). |
-| **A real workflow** | A state machine (pending → confirmed / rejected / expired / cancelled), deadlines, cancellation rules per role, and notifications written in the same transaction as the change they describe. |
-| **Auth and security** | JWT with roles (client, provider, admin), scrypt password hashing, the same error for a wrong password and an unknown email, and rejection of unexpected fields. |
-| **Testing** | **28 tests**, mostly end-to-end over HTTP against a **real PostgreSQL**. Nothing is mocked. |
-| **Delivery** | OpenAPI/Swagger docs, a Dockerfile, `docker compose up`, CI with a PostgreSQL service, and a bilingual developer portal deployed to GitHub Pages. |
+| **Concurrencia bien resuelta** | **10 pedidos simultáneos de "el primer horario libre" reciben 10 horarios distintos**, y el 11.º recibe `409`. Con un horario exacto, **25 pedidos simultáneos generan un solo turno**. |
+| **Lógica de agenda** | Horarios semanales con varios rangos por día, grilla de 15 minutos, preferencia de parte del día, anticipación mínima y zonas horarias. Todo en funciones puras con tests unitarios. |
+| **SQL y modelado** | Migraciones escritas a mano, enums, check constraints, una exclusion constraint GiST sobre rangos de tiempo y bloqueos de fila (`FOR UPDATE`, `FOR NO KEY UPDATE`). |
+| **Un flujo real** | Una máquina de estados (pendiente → confirmado / rechazado / vencido / cancelado), plazos, reglas de cancelación por rol y notificaciones escritas en la misma transacción que el cambio que informan. |
+| **Autenticación y seguridad** | JWT con roles (cliente, profesional, admin), contraseñas con scrypt, el mismo error para contraseña incorrecta y email inexistente, y rechazo de campos inesperados. |
+| **Testing** | **28 tests**, casi todos de punta a punta por HTTP contra un **PostgreSQL real**. No hay nada mockeado. |
+| **Entrega** | Documentación OpenAPI/Swagger, Dockerfile, `docker compose up`, CI con un servicio de PostgreSQL y un portal bilingüe publicado en GitHub Pages. |
 
-## The hard part: ten clients, the same second
+## Lo difícil: diez clientes en el mismo segundo
 
-Ten clients ask for "the first free time on Friday" at the same moment. The naive implementation computes free times, then inserts. All ten see 09:00 as free and all ten try to take 09:00.
+Diez clientes piden "el primer horario libre del viernes" en el mismo momento. La implementación ingenua calcula los horarios libres y después inserta: los diez ven las 09:00 libres y los diez intentan quedarse con las 09:00.
 
-Two layers solve it:
+Lo resuelven dos capas:
 
 ```sql
--- 1. Requests for the same provider take turns (appointments.service.ts).
---    Each one sees what the previous one took, so it gets the next free time.
+-- 1. Los pedidos para un mismo profesional toman turno (appointments.service.ts).
+--    Cada uno ve lo que tomó el anterior, así que recibe el siguiente horario libre.
 select 1 from providers where id = $1 for no key update;
 
--- 2. The database refuses overlaps anyway (migrations/001_init.sql).
+-- 2. Y la base rechaza superposiciones igual (migrations/001_init.sql).
 constraint appointments_no_overlap exclude using gist (
   provider_id with =,
   tstzrange(starts_at, ends_at, '[)') with &&
 ) where (status in ('pending', 'confirmed'))
 ```
 
-The lock only queues requests **for the same provider**. Requests for different providers run in parallel. `FOR NO KEY UPDATE` doesn't block the foreign-key checks of other inserts.
+El bloqueo solo pone en fila los pedidos **del mismo profesional**: los de profesionales distintos corren en paralelo. `FOR NO KEY UPDATE` no frena los chequeos de claves foráneas de otros inserts.
 
-The exclusion constraint is the final guarantee. If any code path ever tried to write two active appointments that overlap, PostgreSQL would reject it (`23P01` → `409`). Half-open `[)` ranges let an appointment that ends at 10:00 sit next to one that starts at 10:00.
+La exclusion constraint es la garantía final. Si algún camino del código intentara guardar dos turnos activos que se superponen, PostgreSQL lo rechazaría (`23P01` → `409`). Con rangos semiabiertos `[)`, un turno que termina a las 10:00 puede ir pegado a uno que empieza a las 10:00.
 
-Why not rely on the constraint alone? I tried that first and the tests caught the problem. When concurrent inserts conflict on an exclusion constraint, each one waits for the other, and PostgreSQL resolves that by aborting one with a **deadlock** error (`40P01`), not a clean conflict. Queuing per provider removes the deadlock.
+¿Por qué no alcanza con la constraint sola? Fue lo primero que probé, y los tests encontraron el problema. Cuando dos inserts concurrentes chocan en una exclusion constraint, cada uno espera al otro, y PostgreSQL lo resuelve abortando uno con un error de **deadlock** (`40P01`), no con un conflicto limpio. Poner en fila los pedidos de cada profesional elimina el deadlock.
 
 ## API
 
-Interactive docs at **`/docs`** (Swagger UI) once the server is running.
+Documentación interactiva en **`/docs`** (Swagger UI) con el servidor corriendo.
 
-| Method | Path | Who | What |
+| Método | Ruta | Quién | Qué |
 |---|---|---|---|
-| `POST` | `/auth/register`, `/auth/login` | anyone | Create a client or provider account, get a JWT |
-| `GET` | `/auth/me` | logged in | The current user |
-| `POST` | `/providers` | provider | Create your provider profile (time zone, hours to confirm) |
-| `GET` | `/providers`, `/providers/:id` | anyone | Providers with their services and hours |
-| `PUT` | `/providers/:id/working-hours` | that provider | Replace the weekly schedule |
-| `POST` | `/providers/:id/services` | that provider | Offer a service: duration and price |
-| `GET` | `/providers/:id/availability?serviceId&date` | anyone | Every free start time that day |
-| `POST` | `/appointments` | logged in | Request: `{serviceId, from, to, timeOfDay}` or `{serviceId, startsAt}` |
-| `GET` | `/appointments/me` | logged in | My appointments as a client |
-| `GET` | `/appointments/inbox?status=` | provider | The provider's agenda; `pending` = needs an answer |
-| `POST` | `/appointments/:id/confirm` | that provider | Confirm a pending request |
-| `POST` | `/appointments/:id/reject` | that provider | Reject with a reason |
-| `POST` | `/appointments/:id/cancel` | client or provider | Clients need 12 h notice once confirmed |
-| `GET` | `/notifications` | logged in | My notifications and the unread count |
-| `POST` | `/notifications/read` | logged in | Mark all as read |
+| `POST` | `/auth/register`, `/auth/login` | cualquiera | Crear una cuenta de cliente o profesional y obtener un JWT |
+| `GET` | `/auth/me` | con sesión | El usuario actual |
+| `POST` | `/providers` | profesional | Crear el perfil (zona horaria, horas para confirmar) |
+| `GET` | `/providers`, `/providers/:id` | cualquiera | Profesionales con sus servicios y horarios |
+| `PUT` | `/providers/:id/working-hours` | ese profesional | Reemplazar el horario semanal |
+| `POST` | `/providers/:id/services` | ese profesional | Ofrecer un servicio: duración y precio |
+| `GET` | `/providers/:id/availability?serviceId&date` | cualquiera | Cada horario libre de ese día |
+| `POST` | `/appointments` | con sesión | Pedir turno: `{serviceId, from, to, timeOfDay}` o `{serviceId, startsAt}` |
+| `GET` | `/appointments/me` | con sesión | Mis turnos como cliente |
+| `GET` | `/appointments/inbox?status=` | profesional | La agenda del profesional; `pending` = por responder |
+| `POST` | `/appointments/:id/confirm` | ese profesional | Confirmar un pedido |
+| `POST` | `/appointments/:id/reject` | ese profesional | Rechazar con un motivo |
+| `POST` | `/appointments/:id/cancel` | cliente o profesional | El cliente necesita 12 h de anticipación si ya estaba confirmado |
+| `GET` | `/notifications` | con sesión | Mis notificaciones y cuántas no leí |
+| `POST` | `/notifications/read` | con sesión | Marcar todas como leídas |
 
 <details>
-<summary>Screenshot of the Swagger docs</summary>
+<summary>Captura de la documentación en Swagger</summary>
 
 ![Swagger UI](docs/swagger.png)
 
 </details>
 
-## The life of an appointment
+## La vida de un turno
 
 ```mermaid
 stateDiagram-v2
   [*] --> pending: POST /appointments
-  pending --> confirmed: provider confirms
-  pending --> rejected: provider rejects (with reason)
-  pending --> expired: no answer in time
-  pending --> cancelled: either side cancels
-  confirmed --> cancelled: client (12 h ahead) or provider
+  pending --> confirmed: el profesional confirma
+  pending --> rejected: el profesional rechaza (con motivo)
+  pending --> expired: nadie respondió a tiempo
+  pending --> cancelled: cualquiera de los dos cancela
+  confirmed --> cancelled: el cliente (con 12 h) o el profesional
 ```
 
-`pending` and `confirmed` hold the time. Every other state frees it.
+`pending` y `confirmed` ocupan el horario. Los demás estados lo liberan.
 
-## Data model
+## Decisiones de ingeniería
 
-```mermaid
-erDiagram
-  USERS ||--o| PROVIDERS : "is a"
-  PROVIDERS ||--o{ WORKING_HOURS : has
-  PROVIDERS ||--o{ SERVICES : offers
-  SERVICES ||--o{ APPOINTMENTS : "booked as"
-  USERS ||--o{ APPOINTMENTS : requests
-  USERS ||--o{ NOTIFICATIONS : receives
+- **La agenda son funciones puras.** `freeSlots()` y `slotProblem()` en `src/scheduling/slots.ts` reciben horarios, intervalos ocupados y "ahora" como argumentos, así que se testean sin base de datos y sin reloj.
+- **Guardar en UTC, razonar en la zona del profesional.** Las fechas son `timestamptz`. El horario de trabajo y "a la tarde" se interpretan en la zona del profesional con Luxon, así que una clase de las 16:00 es a las 16:00 *de Buenos Aires*, corra donde corra el servidor.
+- **Plazos sin cron.** El `respond_by` de un pedido es lo que llegue primero entre el plazo para confirmar y el inicio del turno. Los pedidos vencidos se marcan en la siguiente lectura o escritura de ese profesional, dentro de la misma transacción. Nada puede quedar atrasado.
+- **Las notificaciones son parte del cambio.** Cada notificación se inserta en la misma transacción que el cambio de estado que informa. Una confirmación nunca existe sin su notificación, y al revés tampoco.
+- **SQL en lugar de un ORM.** Las reglas clave son una exclusion constraint y bloqueos de fila, y con SQL directo quedan a la vista. Las migraciones son archivos `.sql` numerados, cada uno aplicado una sola vez en su propia transacción.
+- **Los tests corren la app real.** `createApp()` arma el mismo servidor, con la misma validación, los mismos guards y el mismo Swagger, para producción y para los tests.
 
-  PROVIDERS { uuid id PK
-    uuid user_id FK
-    text timezone
-    int confirm_within_hours }
-  WORKING_HOURS { uuid provider_id FK
-    int weekday
-    time starts_at
-    time ends_at }
-  SERVICES { uuid id PK
-    int duration_minutes
-    int price_cents }
-  APPOINTMENTS { uuid id PK
-    timestamptz starts_at
-    timestamptz ends_at
-    appointment_status status
-    timestamptz respond_by
-    text rejection_reason }
-  NOTIFICATIONS { uuid id PK
-    text kind
-    timestamptz read_at }
-```
+## Cómo correrlo
 
-## Engineering decisions
-
-- **The scheduler is pure functions.** `freeSlots()` and `slotProblem()` in `src/scheduling/slots.ts` take hours, busy intervals and "now" as arguments, so they are unit-tested without a database or a clock.
-- **Store UTC, reason in the provider's time zone.** Timestamps are `timestamptz`. Working hours and "afternoon" are interpreted in the provider's zone with Luxon, so a 16:00 class is at 16:00 *in Buenos Aires* wherever the server runs.
-- **Deadlines without a cron job.** A request's `respond_by` is the sooner of the provider's confirmation window and the start time. Overdue requests expire on the next read or write for that provider, in the same transaction. Nothing can fall behind.
-- **Notifications are part of the change.** Each notification is inserted in the same transaction as the state change it reports, so a confirmation can never happen without its notification, and the reverse can't happen either.
-- **SQL instead of an ORM.** The key rules are an exclusion constraint and row locks. Plain SQL keeps them visible. Migrations are numbered `.sql` files, each applied once in its own transaction.
-- **The tests run the real app.** `createApp()` builds the same server, with the same validation, guards and Swagger setup, for production and for tests.
-
-## Running it
-
-**With Docker** (API and PostgreSQL):
+**Con Docker** (API y PostgreSQL):
 
 ```sh
 docker compose up --build
 # → http://localhost:3000/docs
 ```
 
-**Without Docker**, using your own PostgreSQL 14+:
+**Sin Docker**, con tu propio PostgreSQL 14 o más nuevo:
 
 ```sh
-cp .env.example .env               # set DATABASE_URL and JWT_SECRET
+cp .env.example .env               # completá DATABASE_URL y JWT_SECRET
 npm install
-npm run build && npm start         # applies migrations, then serves on :3000
+npm run build && npm start         # aplica las migraciones y escucha en :3000
 ```
 
-**Tests** need a PostgreSQL database they can wipe:
+**Los tests** necesitan una base de PostgreSQL que puedan borrar:
 
 ```sh
 TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appointments_test npm test
@@ -173,20 +140,20 @@ TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appointments_test 
 
 ## Tests
 
-- **Auto-scheduling**: picks the first free time matching the preference and skips times held by pending requests. **10 simultaneous requests → 10 distinct times**, then `409` when the day is full.
-- **Exact times**: **25 simultaneous requests for one time → 1 appointment**. Times outside working hours, off the grid or too soon are rejected with a clear reason.
-- **Provider answers**: confirm and reject notify the client; a request can't be answered twice; only the right provider can answer; overdue requests expire and free their time.
-- **Cancelling**: clients cancel pending requests anytime and confirmed ones with 12 h notice; providers can always cancel; strangers get `403`.
-- **Providers**: working-hours and service validation, ownership checks, availability that shrinks as requests come in.
-- **Scheduler** (unit tests): the grid, lunch breaks, time of day, busy overlaps, notice, multi-day windows and days off.
-- **Auth**: register and login, duplicate emails ignoring case, no account enumeration, no self-made admins.
+- **Agenda automática**: elige el primer horario libre según la preferencia y saltea los que ocupan pedidos pendientes. **10 pedidos simultáneos → 10 horarios distintos**, y `409` cuando el día está lleno.
+- **Horarios exactos**: **25 pedidos simultáneos por el mismo horario → 1 turno**. Los horarios fuera del horario de trabajo, fuera de la grilla o demasiado pronto se rechazan con un motivo claro.
+- **Respuestas del profesional**: confirmar y rechazar notifican al cliente; un pedido no se responde dos veces; solo responde el profesional correcto; los pedidos vencidos liberan su horario.
+- **Cancelaciones**: el cliente cancela un pendiente cuando quiera y un confirmado con 12 h; el profesional cancela siempre; un extraño recibe `403`.
+- **Profesionales**: validación de horarios y servicios, permisos sobre el propio perfil, y una disponibilidad que se achica a medida que entran pedidos.
+- **Agenda** (tests unitarios): la grilla, el corte del mediodía, la parte del día, superposiciones, la anticipación, búsquedas de varios días y días libres.
+- **Autenticación**: registro y login, emails duplicados sin importar mayúsculas, sin enumeración de cuentas y sin admins autoproclamados.
 
-## Roadmap
+## Próximos pasos
 
-- [ ] Deploy (Render + Neon) so the portal's playground works without running anything locally.
-- [ ] Email or WhatsApp delivery for notifications.
-- [ ] Reschedule: the provider proposes another time instead of only rejecting.
+- [ ] Publicarla (Render + Neon) para que el playground del portal funcione sin correr nada localmente.
+- [ ] Mandar las notificaciones por email o WhatsApp.
+- [ ] Reprogramar: que el profesional proponga otro horario en lugar de solo rechazar.
 
 ## Stack
 
-Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, raw SQL) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal) · Docker · GitHub Actions
+Node 24 · TypeScript · NestJS · PostgreSQL 18 (`pg`, SQL directo) · Luxon · JWT · Swagger/OpenAPI · Vitest + Supertest · React + Vite (portal) · Docker · GitHub Actions
