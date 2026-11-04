@@ -12,7 +12,7 @@ async function main(): Promise<void> {
 
   const app = await createApp(config)
   await app.listen(config.port)
-  console.log(`Court Booking API on http://localhost:${config.port} · docs at /docs`)
+  console.log(`Appointments API on http://localhost:${config.port} · docs at /docs`)
 }
 
 main().catch((error) => {

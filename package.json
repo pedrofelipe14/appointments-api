@@ -5,8 +5,8 @@
   "description": "Appointments API: clients ask for \"this week, afternoon\", the API picks a free time and the provider confirms. No double bookings, even under concurrency.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
-    "dev": "tsx watch src/main.ts",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "dev": "npm run build && npm start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "tsx src/db/migrate.ts",
